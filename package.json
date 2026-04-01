@@ -1,0 +1,70 @@
+{
+  "name": "env-vars-manager",
+  "version": "1.0.0",
+  "description": "Electron app to detect OS and manage environment variables",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:ts": "tsc && tsc -p tsconfig.renderer.json",
+    "watch:main": "tsc -w",
+    "watch:renderer": "tsc -p tsconfig.renderer.json -w",
+    "copy:assets": "node scripts/copy-assets.js",
+    "watch:assets": "nodemon --watch src/renderer -e html,css --exec \"npm run copy:assets\"",
+    "prebuild": "npm run build:ts && npm run copy:assets",
+    "start": "node scripts/start.js",
+    "dev": "concurrently -k \"npm run watch:main\" \"npm run watch:renderer\" \"npm run watch:assets\" \"nodemon --watch dist/main.js --exec \\\"node scripts/start.js --no-build\\\"\"",
+    "build": "npm run prebuild && electron-builder",
+    "pack:win": "npm run prebuild && electron-builder --win",
+    "pack:mac": "npm run prebuild && electron-builder --mac",
+    "pack:linux": "npm run prebuild && electron-builder --linux",
+    "pack:all": "npm run prebuild && electron-builder -wml"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^8.2.2",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-reloader": "^1.2.3",
+    "nodemon": "^3.0.1",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "docx": "^9.6.0",
+    "pdfkit": "^0.17.2",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "uuid": "^10.0.0"
+  },
+  "build": {
+    "appId": "com.envvarsmanager.app",
+    "productName": "Environment Variables Manager",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  }
+}

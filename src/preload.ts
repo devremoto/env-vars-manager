@@ -1,0 +1,31 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+    getOsInfo: () => ipcRenderer.invoke('get-os-info'),
+    getEnvVars: () => ipcRenderer.invoke('get-env-vars'),
+    createEnvVar: (name: string, value: string, isSystem?: boolean, isProtected?: boolean) => ipcRenderer.invoke('create-env-var', name, value, isSystem, isProtected),
+    updateEnvVar: (name: string, value: string, oldName?: string, isSystem?: boolean) => ipcRenderer.invoke('update-env-var', name, value, oldName, isSystem),
+    deleteEnvVar: (name: string, isSystem?: boolean) => ipcRenderer.invoke('delete-env-var', name, isSystem),
+    exportEnvVars: (vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode?: string) => ipcRenderer.invoke('export-env-vars', vars, format, isMasked, mode),
+    importEnvVars: () => ipcRenderer.invoke('import-env-vars'),
+    getProtectedVars: () => ipcRenderer.invoke('get-protected-vars'),
+    toggleProtectedVar: (name: string) => ipcRenderer.invoke('toggle-protected-var', name),
+    protectVars: (names: string[], protect: boolean) => ipcRenderer.invoke('protect-vars', names, protect),
+    getGroups: () => ipcRenderer.invoke('get-groups'),
+    saveGroups: (groups: any) => ipcRenderer.invoke('save-groups', groups),
+    getOsVars: () => ipcRenderer.invoke('get-os-vars'),
+    resetApp: () => ipcRenderer.invoke('reset-app'),
+    openUrl: (url: string) => ipcRenderer.invoke('open-url', url),
+    openPath: (path: string) => ipcRenderer.invoke('open-path', path),
+    showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
+    windowMinimize: () => ipcRenderer.invoke('window-minimize'),
+    windowMaximize: () => ipcRenderer.invoke('window-maximize'),
+    windowClose: () => ipcRenderer.invoke('window-close'),
+    checkIsAdmin: () => ipcRenderer.invoke('check-is-admin'),
+    openCmd: (varName: string) => ipcRenderer.invoke('open-cmd', varName),
+    optimizeVar: (name: string, value: string) => ipcRenderer.invoke('optimize-var', name, value),
+    getVarHistory: (varName?: string) => ipcRenderer.invoke('get-var-history', varName),
+    restoreVar: (historyId: string) => ipcRenderer.invoke('restore-var', historyId),
+    deleteHistory: (ids: string[]) => ipcRenderer.invoke('delete-history', ids),
+});
