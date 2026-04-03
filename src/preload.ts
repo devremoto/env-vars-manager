@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     protectVars: (names: string[], protect: boolean) => ipcRenderer.invoke('protect-vars', names, protect),
     getGroups: () => ipcRenderer.invoke('get-groups'),
     saveGroups: (groups: any) => ipcRenderer.invoke('save-groups', groups),
+    getEnvironments: () => ipcRenderer.invoke('get-environments'),
+    saveEnvironments: (envs: string[]) => ipcRenderer.invoke('save-environments', envs),
     getOsVars: () => ipcRenderer.invoke('get-os-vars'),
     resetApp: () => ipcRenderer.invoke('reset-app'),
     openUrl: (url: string) => ipcRenderer.invoke('open-url', url),

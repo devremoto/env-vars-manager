@@ -985,41 +985,71 @@ export class ModalManager {
         
         let currentMode = 'standard';
 
-        const updatePreview = () => {
+        const updatePreview = async () => {
             const sample = vars.slice(0, 3);
             let text = '';
             const isWin = navigator.userAgent.toLowerCase().includes('win');
             const githubOptions = $('github-options-container');
             const githubInput = $('github-repo-input') as HTMLInputElement;
 
+            const appSettingsOptions = $('appsettings-options-container');
+            const appSettingsEnvInput = $('appsettings-env-input') as HTMLInputElement;
+            const appSettingsIncludePrefixInput = $('appsettings-include-prefix') as HTMLInputElement;
+            const envDatalist = $('env-datalist');
+
+            // Initial load of environments if not done yet for this modal session
+            if (appSettingsOptions && appSettingsOptions.style.display !== 'none' && envDatalist && envDatalist.children.length === 0) {
+                const envs = await window.electronAPI.getEnvironments();
+                envDatalist.innerHTML = envs.map((e: string) => `<option value="${e}">`).join('');
+            }
+
             if (githubOptions) {
                 githubOptions.style.display = currentMode === 'github' ? 'block' : 'none';
+            }
+            if (appSettingsOptions) {
+                appSettingsOptions.style.display = currentMode === 'appsettings' ? 'block' : 'none';
             }
 
             const repo = githubInput?.value || '';
             const repoFlag = repo ? ` --repo ${repo}` : '';
-            
+            const env = appSettingsEnvInput?.value || '';
+            const includePrefix = appSettingsIncludePrefixInput?.checked ?? true;
+
             if (currentMode === 'github') {
                 text += `echo Y | gh auth login --web --git-protocol https\n\n`;
             }
 
-            sample.forEach(v => {
-                const val = (v.isProtected && isMasked) ? '********' : v.value;
-                if (currentMode === 'standard') {
-                    text += isWin ? `set ${v.name}=${val}\n` : `export ${v.name}="${val}"\n`;
-                } else if (currentMode === 'aws') {
-                    text += `export AWS_${v.name.toUpperCase()}="${val}"\n`;
-                } else if (currentMode === 'azure') {
-                    text += `az configure --defaults ${v.name}="${val}"\n`;
-                } else if (currentMode === 'terraform') {
-                    text += `export TF_VAR_${v.name.toLowerCase()}="${val}"\n`;
-                } else if (currentMode === 'github') {
-                    text += `gh secret set ${v.name} -b"${val}"${repoFlag}\n`;
-                }
-            });
+            if (currentMode === 'appsettings') {
+                const fileName = env ? `appsettings.${env}.json` : 'appsettings.json';
+                text = `// File: ${fileName}\n{\n`;
+                sample.forEach(v => {
+                    let name = v.name;
+                    if (!includePrefix) {
+                        const parts = name.split(/__|:/).filter(p => !!p);
+                        if (parts.length > 1) name = parts.slice(1).join('__');
+                    }
+                    text += `  "${name}": "${isMasked && v.isProtected ? '********' : escapeHtml(v.value)}",\n`;
+                });
+                text += (vars.length > 3) ? '  ...\n}' : '}';
+            } else {
+                sample.forEach(v => {
+                    const val = (v.isProtected && isMasked) ? '********' : v.value;
+                    if (currentMode === 'standard') {
+                        text += isWin ? `set ${v.name}=${val}\n` : `export ${v.name}="${val}"\n`;
+                    } else if (currentMode === 'aws') {
+                        text += `export AWS_${v.name.toUpperCase()}="${val}"\n`;
+                    } else if (currentMode === 'azure') {
+                        text += `az configure --defaults ${v.name}="${val}"\n`;
+                    } else if (currentMode === 'terraform') {
+                        text += `export TF_VAR_${v.name.toLowerCase()}="${val}"\n`;
+                    } else if (currentMode === 'github') {
+                        text += `gh secret set ${v.name} -b"${val}"${repoFlag}\n`;
+                    }
+                });
+            }
 
-            // Add pause to preview (unless it's terraform-style)
-            if (currentMode !== 'terraform') {
+            // Add pause to preview (unless it's terraform-style or appsettings)
+            if (currentMode !== 'terraform' && currentMode !== 'appsettings') {
                 text += '\n';
                 if (isWin) {
                     text += `pause\n`;
@@ -1028,13 +1058,23 @@ export class ModalManager {
                 }
             }
 
-            if (vars.length > 3) text += `# ... and ${vars.length - 3} more`;
+            if (vars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${vars.length - 3} more`;
             if (preview) preview.textContent = text;
         };
 
         const githubRepoInput = $('github-repo-input');
         if (githubRepoInput) {
             githubRepoInput.oninput = updatePreview;
+        }
+
+        const appSettingsEnvInput = $('appsettings-env-input');
+        if (appSettingsEnvInput) {
+            appSettingsEnvInput.oninput = updatePreview;
+        }
+
+        const appSettingsIncludePrefixInput = $('appsettings-include-prefix');
+        if (appSettingsIncludePrefixInput) {
+            appSettingsIncludePrefixInput.onchange = updatePreview;
         }
 
         modeButtons.forEach(btn => {
@@ -1052,10 +1092,27 @@ export class ModalManager {
         
         if (saveBtn) {
             saveBtn.onclick = async () => {
-                const githubRepo = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
-                const res = await window.electronAPI.exportEnvVars(vars, 'script', isMasked, currentMode, githubRepo);
+                let extra = '';
+                if (currentMode === 'github') {
+                    extra = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
+                } else if (currentMode === 'appsettings') {
+                    const envInput = document.getElementById('appsettings-env-input') as HTMLInputElement;
+                    const env = envInput?.value || '';
+                    const includePrefix = (document.getElementById('appsettings-include-prefix') as HTMLInputElement)?.checked;
+                    extra = `${env}|${includePrefix}`;
+
+                    // Persistent addition of new environment
+                    if (env) {
+                        const envs = await window.electronAPI.getEnvironments();
+                        if (!envs.includes(env)) {
+                            envs.push(env);
+                            await window.electronAPI.saveEnvironments(envs);
+                        }
+                    }
+                }
+                const res = await window.electronAPI.exportEnvVars(vars, 'script', isMasked, currentMode, extra);
                 if (res.success) {
-                    showToast('Script exported successfully');
+                    showToast('Exported successfully');
                     close();
                 } else if (res.error !== 'cancelled') {
                     showToast(`Export failed: ${res.error}`, 'error');

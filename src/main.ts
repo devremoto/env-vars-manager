@@ -22,6 +22,7 @@ const execAsync = promisify(exec);
 
 // Path to store protected variables data
 let protectedVarsPath = '';
+let environmentsPath = '';
 let groupsPath = '';
 
 interface EnvVar {
@@ -79,6 +80,11 @@ app.on('ready', () => {
     groupsPath = path.join(app.getPath('userData'), 'groups.json');
     if (!fs.existsSync(groupsPath)) {
         fs.writeFileSync(groupsPath, JSON.stringify({}), 'utf-8');
+    }
+
+    environmentsPath = path.join(app.getPath('userData'), 'environments.json');
+    if (!fs.existsSync(environmentsPath)) {
+        fs.writeFileSync(environmentsPath, JSON.stringify(['Development', 'Staging', 'Production']), 'utf-8');
     }
 });
 
@@ -495,6 +501,26 @@ ipcMain.handle('save-groups', (_event: any, groups: Record<string, string[]>): {
     }
 });
 
+// Environments Handlers
+ipcMain.handle('get-environments', (): string[] => {
+    try {
+        if (!fs.existsSync(environmentsPath)) return ['Development', 'Staging', 'Production'];
+        const content = fs.readFileSync(environmentsPath, 'utf-8');
+        return JSON.parse(content);
+    } catch {
+        return ['Development', 'Staging', 'Production'];
+    }
+});
+
+ipcMain.handle('save-environments', (_event: any, envs: string[]): { success: boolean; error?: string } => {
+    try {
+        fs.writeFileSync(environmentsPath, JSON.stringify(envs, null, 2), 'utf-8');
+        return { success: true };
+    } catch (err: any) {
+        return { success: false, error: err.message };
+    }
+});
+
 // Update environment variable
 ipcMain.handle('update-env-var', async (_event: any, name: string, value: string, oldName?: string, isSystem: boolean = false): Promise<{ success: boolean; error?: string }> => {
     const platform = os.platform();
@@ -719,18 +745,24 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
     if (format === 'docx') defaultExt = 'docx';
     if (format === 'env') defaultExt = 'env';
     if (format === 'txt') defaultExt = 'txt';
+    let defaultFileName = `env-vars-export.${defaultExt}`;
     if (format === 'script') {
         const isWin = os.platform() === 'win32';
         defaultExt = isWin ? 'cmd' : 'sh';
         if (mode === 'terraform') defaultExt = 'tfvars';
+        if (mode === 'appsettings') {
+            defaultExt = 'json';
+            const env = (extraParam || '|').split('|')[0];
+            defaultFileName = env ? `appsettings.${env}.json` : 'appsettings.json';
+        }
     }
 
     let filePath: string;
 
-    if (format === 'script') {
+    if (format === 'script' || format === 'json' || format === 'csv') {
         const result = await dialog.showSaveDialog(mainWindow, {
             title: `Export ${format.toUpperCase()} File`,
-            defaultPath: path.join(os.homedir(), `env-vars-export.${defaultExt}`),
+            defaultPath: path.join(os.homedir(), defaultFileName),
             filters: [
                 { name: `${format.toUpperCase()} Files`, extensions: [defaultExt] }
             ],
@@ -771,6 +803,40 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             if (mode === 'github') {
                 lines.push('echo Y | gh auth login --web --git-protocol https');
                 lines.push('');
+            }
+
+            if (mode === 'appsettings') {
+                const [envVal, includePrefixVal] = (extraParam || '|').split('|');
+                const includePrefix = includePrefixVal !== 'false';
+                const data: any = {};
+                
+                maskedVars.forEach(v => {
+                    let name = v.name;
+                    if (!includePrefix) {
+                        const parts = name.split(/[__:]/);
+                        if (parts.length > 1) {
+                            name = parts.slice(1).join('__');
+                        }
+                    }
+                    
+                    const pathParts = name.split(/__|:/).filter(p => !!p);
+                    let current = data;
+                    for (let i = 0; i < pathParts.length; i++) {
+                        const segment = pathParts[i];
+                        if (i === pathParts.length - 1) {
+                            current[segment] = v.value;
+                        } else {
+                            if (!current[segment] || typeof current[segment] !== 'object') {
+                                current[segment] = {};
+                            }
+                            current = current[segment];
+                        }
+                    }
+                });
+
+                fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+                shell.openPath(filePath);
+                return { success: true };
             }
 
             maskedVars.forEach(v => {

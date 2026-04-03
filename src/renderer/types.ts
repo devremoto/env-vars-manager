@@ -11,6 +11,8 @@ export interface ElectronAPI {
     protectVars: (names: string[], protect: boolean) => Promise<{ success: boolean; error?: string }>;
     getGroups: () => Promise<Record<string, string[]>>;
     saveGroups: (groups: Record<string, string[]>) => Promise<{ success: boolean; error?: string }>;
+    getEnvironments: () => Promise<string[]>;
+    saveEnvironments: (envs: string[]) => Promise<{ success: boolean; error?: string }>;
     resetApp: () => Promise<{ success: boolean; error?: string }>;
     openUrl: (url: string) => Promise<void>;
     openPath: (path: string) => Promise<void>;

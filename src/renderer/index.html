@@ -372,7 +372,7 @@
     </div>
     <!-- Script Export Modal -->
     <div id="script-export-overlay" class="modal-overlay">
-        <div class="modal" style="max-width: 500px;">
+        <div class="modal" style="max-width: 700px;">
             <div class="modal-header">
                 <h2>Export as Script</h2>
                 <button id="script-export-close" class="modal-close">&times;</button>
@@ -380,7 +380,7 @@
             <div class="modal-body">
                 <p style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary);">Select the script format for exporting your variables:</p>
                 
-                <div class="export-options-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="export-options-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
                     <div class="export-mode-btn active" data-mode="standard">
                         <div class="mode-icon">📜</div>
                         <div class="mode-title">Standard Shell</div>
@@ -406,11 +406,28 @@
                         <div class="mode-title">GitHub CLI</div>
                         <div class="mode-desc">gh secret set</div>
                     </div>
+                    <div class="export-mode-btn" data-mode="appsettings">
+                        <div class="mode-icon">⚙️</div>
+                        <div class="mode-title">App Settings</div>
+                        <div class="mode-desc">appsettings.{env}.json</div>
+                    </div>
                 </div>
                 
                 <div id="github-options-container" style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
                     <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Optional: Target Repository</label>
                     <input type="text" id="github-repo-input" placeholder="owner/repo" style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                </div>
+
+                <div id="appsettings-options-container" style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Environment (optional)</label>
+                        <input type="text" id="appsettings-env-input" list="env-datalist" placeholder="e.g. Development" style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                        <datalist id="env-datalist"></datalist>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="appsettings-include-prefix" checked style="width: 14px; height: 14px;">
+                        <label for="appsettings-include-prefix" style="font-size: 12px; color: var(--text-secondary); cursor: pointer;">Include full variable name (Suppress prefix if unchecked)</label>
+                    </div>
                 </div>
                 
                 <div style="margin-top: 20px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 11px; border: 1px solid var(--border-default);">
