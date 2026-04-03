@@ -983,26 +983,32 @@ export class ModalManager {
         const saveBtn = $('script-export-save');
         const modeButtons = overlay.querySelectorAll('.export-mode-btn');
         const maskCheckbox = $('export-mask-protected') as HTMLInputElement;
-
-        if (maskCheckbox) {
-            maskCheckbox.checked = isMasked;
-        }
+        const maskBlankCheckbox = $('export-mask-blank') as HTMLInputElement;
+        const excludeCheckbox = $('export-exclude-protected') as HTMLInputElement;
+        const githubRepoInput = $('github-repo-input') as HTMLInputElement;
+        const appSettingsEnvInput = $('appsettings-env-input') as HTMLInputElement;
+        const appSettingsIncludePrefixInput = $('appsettings-include-prefix') as HTMLInputElement;
         
-        let currentMode = 'standard';
+        const activeBtn = overlay.querySelector('.export-mode-btn.active') as HTMLElement;
+        let currentMode = activeBtn?.dataset.mode || 'standard';
 
         const updatePreview = async () => {
-            const sample = vars.slice(0, 3);
+            const currentMaskedMaster = maskCheckbox?.checked ?? isMasked;
+            const currentExclude = excludeCheckbox?.checked ?? false;
+            const currentBlank = maskBlankCheckbox?.checked ?? false;
+
+            const filteredVars = currentExclude ? vars.filter(v => !v.isProtected) : vars;
+            const sample = filteredVars.slice(0, 3);
             let text = '';
+            // Determine the final mask string to use
+            const maskString = currentBlank ? '' : '********';
+            const isActiveMasking = currentMaskedMaster && !currentExclude;
+            
             const isWin = navigator.userAgent.toLowerCase().includes('win');
             const githubOptions = $('github-options-container');
-            const githubInput = $('github-repo-input') as HTMLInputElement;
-
+            const githubInput = githubRepoInput;
             const appSettingsOptions = $('appsettings-options-container');
-            const appSettingsEnvInput = $('appsettings-env-input') as HTMLInputElement;
-            const appSettingsIncludePrefixInput = $('appsettings-include-prefix') as HTMLInputElement;
             const envDatalist = $('env-datalist');
-
-            const currentMasked = maskCheckbox?.checked ?? isMasked;
 
             // Initial load of environments if not done yet for this modal session
             if (appSettingsOptions && appSettingsOptions.style.display !== 'none' && envDatalist && envDatalist.children.length === 0) {
@@ -1035,12 +1041,12 @@ export class ModalManager {
                         const parts = name.split(/__|:/).filter((p: string) => !!p);
                         if (parts.length > 1) name = parts.slice(1).join('__');
                     }
-                    text += `  "${name}": "${currentMasked && v.isProtected ? '********' : escapeHtml(v.value)}",\n`;
+                    text += `  "${name}": "${isActiveMasking && v.isProtected ? maskString : escapeHtml(v.value)}",\n`;
                 });
-                text += (vars.length > 3) ? '  ...\n}' : '}';
+                text += (filteredVars.length > 3) ? '  ...\n}' : '}';
             } else {
                 sample.forEach(v => {
-                    const val = (v.isProtected && currentMasked) ? '********' : v.value;
+                    const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
                     if (currentMode === 'standard') {
                         text += isWin ? `set ${v.name}=${val}\n` : `export ${v.name}="${val}"\n`;
                     } else if (currentMode === 'aws') {
@@ -1065,28 +1071,51 @@ export class ModalManager {
                 }
             }
 
-            if (vars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${vars.length - 3} more`;
+            if (filteredVars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${filteredVars.length - 3} more`;
             if (preview) preview.textContent = text;
         };
 
-        const githubRepoInput = $('github-repo-input');
-        if (githubRepoInput) {
-            githubRepoInput.oninput = updatePreview;
-        }
-
-        const appSettingsEnvInput = $('appsettings-env-input');
-        if (appSettingsEnvInput) {
-            appSettingsEnvInput.oninput = updatePreview;
-        }
-
-        const appSettingsIncludePrefixInput = $('appsettings-include-prefix');
-        if (appSettingsIncludePrefixInput) {
-            appSettingsIncludePrefixInput.onchange = updatePreview;
-        }
+        // Event listeners
+        if (githubRepoInput) githubRepoInput.oninput = updatePreview;
+        if (appSettingsEnvInput) appSettingsEnvInput.oninput = updatePreview;
+        if (appSettingsIncludePrefixInput) appSettingsIncludePrefixInput.onchange = updatePreview;
+        const syncCheckboxes = () => {
+            const isMasterOn = maskCheckbox?.checked ?? false;
+            if (maskBlankCheckbox) {
+                maskBlankCheckbox.disabled = !isMasterOn;
+                const parent = maskBlankCheckbox.parentElement;
+                if (parent) parent.style.opacity = isMasterOn ? '1' : '0.5';
+                if (!isMasterOn) maskBlankCheckbox.checked = false;
+            }
+            if (excludeCheckbox) {
+                excludeCheckbox.disabled = !isMasterOn;
+                const parent = excludeCheckbox.parentElement;
+                if (parent) parent.style.opacity = isMasterOn ? '1' : '0.5';
+                if (!isMasterOn) excludeCheckbox.checked = false;
+            }
+        };
 
         if (maskCheckbox) {
-            maskCheckbox.onchange = updatePreview;
+            maskCheckbox.checked = isMasked;
+            maskCheckbox.onchange = () => {
+                syncCheckboxes();
+                updatePreview();
+            };
         }
+        if (maskBlankCheckbox) {
+            maskBlankCheckbox.onchange = () => {
+                if (maskBlankCheckbox.checked && excludeCheckbox) excludeCheckbox.checked = false;
+                updatePreview();
+            };
+        }
+        if (excludeCheckbox) {
+            excludeCheckbox.onchange = () => {
+                if (excludeCheckbox.checked && maskBlankCheckbox) maskBlankCheckbox.checked = false;
+                updatePreview();
+            };
+        }
+        
+        syncCheckboxes();
 
         modeButtons.forEach(btn => {
             (btn as HTMLElement).onclick = () => {
@@ -1121,7 +1150,9 @@ export class ModalManager {
                         }
                     }
                 }
-                const res = await (window as any).electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra, action);
+                const currentExclude = excludeCheckbox?.checked ?? false;
+                const currentBlank = maskBlankCheckbox?.checked ?? false;
+                const res = await (window as any).electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra, action, currentExclude, currentBlank);
                 if (res.success) {
                     if (action === 'save') showToast('Exported successfully');
                     close();

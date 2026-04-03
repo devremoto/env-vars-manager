@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createEnvVar: (name: string, value: string, isSystem?: boolean, isProtected?: boolean) => ipcRenderer.invoke('create-env-var', name, value, isSystem, isProtected),
     updateEnvVar: (name: string, value: string, oldName?: string, isSystem?: boolean) => ipcRenderer.invoke('update-env-var', name, value, oldName, isSystem),
     deleteEnvVar: (name: string, isSystem?: boolean) => ipcRenderer.invoke('delete-env-var', name, isSystem),
-    exportEnvVars: (vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode?: string, extraParam?: string, action?: string) => ipcRenderer.invoke('export-env-vars', vars, format, isMasked, mode, extraParam, action),
+    exportEnvVars: (vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode?: string, extraParam?: string, action?: string, excludeProtected?: boolean, maskBlank?: boolean) => ipcRenderer.invoke('export-env-vars', vars, format, isMasked, mode, extraParam, action, excludeProtected, maskBlank),
     importEnvVars: () => ipcRenderer.invoke('import-env-vars'),
     getProtectedVars: () => ipcRenderer.invoke('get-protected-vars'),
     toggleProtectedVar: (name: string) => ipcRenderer.invoke('toggle-protected-var', name),

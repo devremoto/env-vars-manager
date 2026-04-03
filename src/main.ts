@@ -765,9 +765,10 @@ ipcMain.handle('reset-app', async (): Promise<{ success: boolean; error?: string
 });
 
 // Export env vars
-ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = '', action: string = 'save'): Promise<{ success: boolean; filePath?: string; error?: string }> => {
+ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = '', action: string = 'save', excludeProtected: boolean = false, maskBlank: boolean = false): Promise<{ success: boolean; filePath?: string; error?: string }> => {
     if (!mainWindow) return { success: false, error: 'No window' };
 
+    // Use formatting logic established above (extension calculation etc) ...
     let defaultExt = format;
     if (format === 'docx') defaultExt = 'docx';
     if (format === 'env') defaultExt = 'env';
@@ -804,9 +805,13 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
     }
 
     try {
-        const maskedVars = vars.map(v => ({
+        // Filter out protected variables if requested
+        const varsToProcess = excludeProtected ? vars.filter(v => !v.isProtected) : vars;
+        const maskString = maskBlank ? '' : '********';
+
+        const maskedVars = varsToProcess.map(v => ({
             ...v,
-            value: (v.isProtected && isMasked) ? '********' : v.value
+            value: (v.isProtected && (isMasked || maskBlank)) ? maskString : v.value
         }));
 
         if (format === 'json') {
