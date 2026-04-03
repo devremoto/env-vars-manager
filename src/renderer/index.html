@@ -372,7 +372,7 @@
     </div>
     <!-- Script Export Modal -->
     <div id="script-export-overlay" class="modal-overlay">
-        <div class="modal" style="max-width: 700px;">
+        <div class="modal" style="max-width: 900px;">
             <div class="modal-header">
                 <h2>Export as Script</h2>
                 <button id="script-export-close" class="modal-close">&times;</button>
@@ -411,6 +411,11 @@
                         <div class="mode-title">App Settings</div>
                         <div class="mode-desc">appsettings.{env}.json</div>
                     </div>
+                </div>
+
+                <div style="margin-top: 15px; display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 6px;">
+                    <input type="checkbox" id="export-mask-protected" style="width: 14px; height: 14px;">
+                    <label for="export-mask-protected" style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Mask Protected Variables (export with ********)</label>
                 </div>
                 
                 <div id="github-options-container" style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">

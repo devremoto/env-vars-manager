@@ -982,6 +982,11 @@ export class ModalManager {
         const cancelBtn = $('script-export-cancel');
         const saveBtn = $('script-export-save');
         const modeButtons = overlay.querySelectorAll('.export-mode-btn');
+        const maskCheckbox = $('export-mask-protected') as HTMLInputElement;
+
+        if (maskCheckbox) {
+            maskCheckbox.checked = isMasked;
+        }
         
         let currentMode = 'standard';
 
@@ -996,6 +1001,8 @@ export class ModalManager {
             const appSettingsEnvInput = $('appsettings-env-input') as HTMLInputElement;
             const appSettingsIncludePrefixInput = $('appsettings-include-prefix') as HTMLInputElement;
             const envDatalist = $('env-datalist');
+
+            const currentMasked = maskCheckbox?.checked ?? isMasked;
 
             // Initial load of environments if not done yet for this modal session
             if (appSettingsOptions && appSettingsOptions.style.display !== 'none' && envDatalist && envDatalist.children.length === 0) {
@@ -1025,15 +1032,15 @@ export class ModalManager {
                 sample.forEach(v => {
                     let name = v.name;
                     if (!includePrefix) {
-                        const parts = name.split(/__|:/).filter(p => !!p);
+                        const parts = name.split(/__|:/).filter((p: string) => !!p);
                         if (parts.length > 1) name = parts.slice(1).join('__');
                     }
-                    text += `  "${name}": "${isMasked && v.isProtected ? '********' : escapeHtml(v.value)}",\n`;
+                    text += `  "${name}": "${currentMasked && v.isProtected ? '********' : escapeHtml(v.value)}",\n`;
                 });
                 text += (vars.length > 3) ? '  ...\n}' : '}';
             } else {
                 sample.forEach(v => {
-                    const val = (v.isProtected && isMasked) ? '********' : v.value;
+                    const val = (v.isProtected && currentMasked) ? '********' : v.value;
                     if (currentMode === 'standard') {
                         text += isWin ? `set ${v.name}=${val}\n` : `export ${v.name}="${val}"\n`;
                     } else if (currentMode === 'aws') {
@@ -1077,6 +1084,10 @@ export class ModalManager {
             appSettingsIncludePrefixInput.onchange = updatePreview;
         }
 
+        if (maskCheckbox) {
+            maskCheckbox.onchange = updatePreview;
+        }
+
         modeButtons.forEach(btn => {
             (btn as HTMLElement).onclick = () => {
                 modeButtons.forEach(b => b.classList.remove('active'));
@@ -1092,6 +1103,7 @@ export class ModalManager {
         
         if (saveBtn) {
             saveBtn.onclick = async () => {
+                const currentMasked = maskCheckbox?.checked ?? isMasked;
                 let extra = '';
                 if (currentMode === 'github') {
                     extra = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
@@ -1110,7 +1122,7 @@ export class ModalManager {
                         }
                     }
                 }
-                const res = await window.electronAPI.exportEnvVars(vars, 'script', isMasked, currentMode, extra);
+                const res = await window.electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra);
                 if (res.success) {
                     showToast('Exported successfully');
                     close();

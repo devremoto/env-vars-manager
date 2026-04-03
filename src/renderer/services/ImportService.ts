@@ -102,15 +102,26 @@ export class ImportService {
                 if (Array.isArray(data)) {
                     vars = data;
                 } else {
-                    // Flatten nested objects
+                    // Flatten nested objects and arrays
                     const flatten = (obj: any, prefix = ''): { name: string, value: string }[] => {
                         let items: { name: string, value: string }[] = [];
-                        for (const [key, value] of Object.entries(obj)) {
-                            const newKey = prefix ? `${prefix}__${key}` : key;
-                            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-                                items.push(...flatten(value, newKey));
-                            } else {
-                                items.push({ name: newKey, value: String(value) });
+                        if (Array.isArray(obj)) {
+                            obj.forEach((val, idx) => {
+                                const newKey = `${prefix}__${idx + 1}`;
+                                if (val !== null && typeof val === 'object') {
+                                    items.push(...flatten(val, newKey));
+                                } else {
+                                    items.push({ name: newKey, value: String(val) });
+                                }
+                            });
+                        } else {
+                            for (const [key, value] of Object.entries(obj)) {
+                                const newKey = prefix ? `${prefix}__${key}` : key;
+                                if (value !== null && typeof value === 'object') {
+                                    items.push(...flatten(value, newKey));
+                                } else {
+                                    items.push({ name: newKey, value: String(value) });
+                                }
                             }
                         }
                         return items;

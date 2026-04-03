@@ -813,7 +813,7 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                 maskedVars.forEach(v => {
                     let name = v.name;
                     if (!includePrefix) {
-                        const parts = name.split(/[__:]/);
+                        const parts = name.split(/__|:/).filter(p => !!p);
                         if (parts.length > 1) {
                             name = parts.slice(1).join('__');
                         }
@@ -834,7 +834,37 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                     }
                 });
 
-                fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+                // Post-process to convert objects with numeric keys to arrays
+                const convertToArray = (obj: any): any => {
+                    if (obj === null || typeof obj !== 'object') return obj;
+                    
+                    const keys = Object.keys(obj);
+                    const isAllNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                    
+                    if (isAllNumeric) {
+                        const sortedKeys = keys.map(Number).sort((a, b) => a - b);
+                        const minKey = sortedKeys[0];
+                        const arr: any[] = [];
+                        
+                        keys.forEach(k => {
+                            const index = parseInt(k, 10);
+                            // If user used 1-based indexing (e.g. __1), convert to 0-based
+                            const arrayIdx = minKey === 1 ? index - 1 : index;
+                            if (arrayIdx >= 0) {
+                                arr[arrayIdx] = convertToArray(obj[k]);
+                            }
+                        });
+                        return arr;
+                    }
+
+                    Object.keys(obj).forEach(k => {
+                        obj[k] = convertToArray(obj[k]);
+                    });
+                    return obj;
+                };
+
+                const finalData = convertToArray(data);
+                fs.writeFileSync(filePath, JSON.stringify(finalData, null, 2), 'utf-8');
                 shell.openPath(filePath);
                 return { success: true };
             }
@@ -1097,17 +1127,26 @@ ipcMain.handle('import-env-vars', async (): Promise<{ success: boolean; vars?: E
                 if (Array.isArray(data)) {
                     envVars = data;
                 } else {
-                    // Recursive flattening helper
+                    // Flattener supporting nested objects and arrays
                     const flatten = (obj: any, prefix = ''): { name: string, value: string }[] => {
                         let items: { name: string, value: string }[] = [];
-                        if (obj === null || typeof obj !== 'object') return items;
-                        
-                        for (const [key, value] of Object.entries(obj)) {
-                            const newKey = prefix ? `${prefix}__${key}` : key;
-                            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-                                items.push(...flatten(value, newKey));
-                            } else {
-                                items.push({ name: newKey, value: String(value) });
+                        if (Array.isArray(obj)) {
+                            obj.forEach((val, idx) => {
+                                const newKey = `${prefix}__${idx + 1}`;
+                                if (val !== null && typeof val === 'object') {
+                                    items.push(...flatten(val, newKey));
+                                } else {
+                                    items.push({ name: newKey, value: String(val) });
+                                }
+                            });
+                        } else if (obj !== null && typeof obj === 'object') {
+                            for (const [key, value] of Object.entries(obj)) {
+                                const newKey = prefix ? `${prefix}__${key}` : key;
+                                if (value !== null && typeof value === 'object') {
+                                    items.push(...flatten(value, newKey));
+                                } else {
+                                    items.push({ name: newKey, value: String(value) });
+                                }
                             }
                         }
                         return items;
