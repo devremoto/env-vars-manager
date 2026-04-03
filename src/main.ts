@@ -3,6 +3,8 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const url = require('url');
+const http = require('http');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const { initDB, upsertVariable, deleteVariable, getHistory, getHistoryById, getAllVariables, logHistory, getVariableByName } = require('./db');
@@ -30,6 +32,31 @@ interface EnvVar {
     value: string;
     isSystem?: boolean;
     canOptimize?: boolean;
+}
+
+function openInBrowserWithLocalServer(content: string, contentType: string, filename: string) {
+    const server = http.createServer((_req: any, res: any) => {
+        res.writeHead(200, { 
+            'Content-Type': contentType,
+            'Content-Disposition': `inline; filename="${filename}"`,
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(content);
+        // We'll close later via timeout to ensure the browser has time to finish initial reads
+    });
+
+    server.listen(0, '127.0.0.1', () => {
+        const addr = server.address() as any;
+        const port = addr?.port;
+        if (port) {
+            shell.openExternal(`http://127.0.0.1:${port}/${filename}`);
+        }
+    });
+
+    // Auto-shutdown after 30 seconds to clean up
+    setTimeout(() => {
+        try { server.close(); } catch (e) { /* ignore */ }
+    }, 30000);
 }
 
 interface OsInfo {
@@ -738,7 +765,7 @@ ipcMain.handle('reset-app', async (): Promise<{ success: boolean; error?: string
 });
 
 // Export env vars
-ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = ''): Promise<{ success: boolean; filePath?: string; error?: string }> => {
+ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = '', action: string = 'save'): Promise<{ success: boolean; filePath?: string; error?: string }> => {
     if (!mainWindow) return { success: false, error: 'No window' };
 
     let defaultExt = format;
@@ -759,7 +786,7 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
 
     let filePath: string;
 
-    if (format === 'script' || format === 'json' || format === 'csv') {
+    if (action === 'save') {
         const result = await dialog.showSaveDialog(mainWindow, {
             title: `Export ${format.toUpperCase()} File`,
             defaultPath: path.join(os.homedir(), defaultFileName),
@@ -773,7 +800,6 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
         }
         filePath = result.filePath;
     } else {
-        // Save to temp directory to be opened directly
         filePath = path.join(os.tmpdir(), `env-vars-export_${Date.now()}.${defaultExt}`);
     }
 
@@ -784,17 +810,32 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
         }));
 
         if (format === 'json') {
-            fs.writeFileSync(filePath, JSON.stringify(maskedVars, null, 2), 'utf-8');
+            const content = JSON.stringify(maskedVars, null, 2);
+            if (action === 'browser') {
+                openInBrowserWithLocalServer(content, 'application/json', 'export.json');
+                return { success: true };
+            }
+            fs.writeFileSync(filePath, content, 'utf-8');
+            if (action === 'editor') shell.openPath(filePath);
         } else if (format === 'csv') {
-            const csvContent = ['Name,Value,Group', ...maskedVars.map(v => `"${v.name.replace(/"/g, '""')}","${v.value.replace(/"/g, '""')}","${(v.groupName || '').replace(/"/g, '""')}"`)].join('\n');
-            fs.writeFileSync(filePath, csvContent, 'utf-8');
+            const content = ['Name,Value,Group', ...maskedVars.map(v => `"${v.name.replace(/"/g, '""')}","${v.value.replace(/"/g, '""')}","${(v.groupName || '').replace(/"/g, '""')}"`)].join('\n');
+            if (action === 'browser') {
+                openInBrowserWithLocalServer(content, 'text/csv', 'export.csv');
+                return { success: true };
+            }
+            fs.writeFileSync(filePath, content, 'utf-8');
+            if (action === 'editor') shell.openPath(filePath);
         } else if (format === 'txt' || format === 'env') {
             const content = maskedVars.map(v => {
                 const line = `${v.name}=${v.value}`;
                 return (v.isProtected && isMasked) ? (format === 'env' ? `# ${line}` : line) : line;
             }).join('\n');
+            if (action === 'browser') {
+                openInBrowserWithLocalServer(content, 'text/plain', format === 'env' ? '.env' : 'export.txt');
+                return { success: true };
+            }
             fs.writeFileSync(filePath, content, 'utf-8');
-            shell.openPath(filePath); 
+            if (action === 'editor') shell.openPath(filePath);
         } else if (format === 'script') {
             const isWin = os.platform() === 'win32';
             const lines: string[] = [];
@@ -864,8 +905,14 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                 };
 
                 const finalData = convertToArray(data);
-                fs.writeFileSync(filePath, JSON.stringify(finalData, null, 2), 'utf-8');
-                shell.openPath(filePath);
+                const content = JSON.stringify(finalData, null, 2);
+                if (action === 'browser') {
+                    const filename = envVal ? `appsettings.${envVal}.json` : 'appsettings.json';
+                    openInBrowserWithLocalServer(content, 'application/json', filename);
+                } else {
+                    fs.writeFileSync(filePath, content, 'utf-8');
+                    shell.openPath(filePath);
+                }
                 return { success: true };
             }
 
@@ -912,12 +959,17 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                 }
             }
 
-            fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
-            shell.openPath(filePath);
+            const content = lines.join(os.EOL);
+            if (action === 'browser') {
+                const filename = mode === 'terraform' ? 'variables.tfvars' : (isWin ? 'export.bat' : 'export.sh');
+                openInBrowserWithLocalServer(content, 'text/plain', filename);
+            } else {
+                fs.writeFileSync(filePath, content, 'utf-8');
+                shell.openPath(filePath);
+            }
         } else if (format === 'html') {
             let htmlRows = '';
-            let currentGroup: string | undefined | null = null; // using null as initial state to force first group header
-
+            let currentGroup: string | undefined | null = null;
             for (const v of maskedVars) {
                 if (v.groupName !== currentGroup) {
                     currentGroup = v.groupName;
@@ -927,169 +979,60 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                 }
                 htmlRows += `<tr><td>${v.name}</td><td>${v.value}</td></tr>`;
             }
-
-            const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-<style>
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 40px; color: #334155; background-color: #f8fafc; }
-.container { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-h2 { color: #0f172a; border-bottom: 2px solid #6366f1; padding-bottom: 15px; margin-top: 0; font-weight: 700; }
-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-th, td { border: 1px solid #e2e8f0; padding: 14px 16px; text-align: left; word-wrap: break-word; white-space: pre-wrap; font-size: 14px; }
-th { background-color: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 12px; width: 50%; letter-spacing: 0.05em; }
-.group-header td { background-color: #e0e7ff; color: #3730a3; font-weight: 700; font-size: 15px; text-transform: uppercase; padding: 16px; text-align: center; letter-spacing: 0.05em; border-top: 2px solid #c7d2fe; border-bottom: 2px solid #c7d2fe; }
-.col-headers th { background-color: #f8fafc; border-bottom: 2px solid #cbd5e1; }
-tr:hover:not(.group-header):not(.col-headers) { background-color: #eff6ff; }
-</style>
-</head>
-<body>
-<div class="container">
-<h2>Environment Variables</h2>
-<table>
-  ${htmlRows}
-</table>
-</div>
-</body>
-</html>`;
-            fs.writeFileSync(filePath, htmlContent, 'utf-8');
+            const htmlContent = `<!DOCTYPE html><html><head><style>body { font-family: sans-serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 8px; text-align: left; } .group-header { background: #eee; font-weight: bold; }</style></head><body><h2>Environment Variables</h2><table>${htmlRows}</table></body></html>`;
+            
+            if (action === 'browser') {
+                openInBrowserWithLocalServer(htmlContent, 'text/html', 'variables.html');
+            } else {
+                fs.writeFileSync(filePath, htmlContent, 'utf-8');
+                if (action === 'editor') shell.openPath(filePath);
+            }
+            return { success: true, filePath };
         } else if (format === 'pdf') {
             let htmlRows = '';
             let currentGroup: string | undefined | null = null;
-
             for (const v of maskedVars) {
                 if (v.groupName !== currentGroup) {
                     currentGroup = v.groupName;
                     const groupTitle = currentGroup || 'Ungrouped Variables';
                     htmlRows += `<tr class="group-header"><td colspan="2">${groupTitle}</td></tr>`;
-                    htmlRows += `<tr class="col-headers"><th>Name</th><th>Value</th></tr>`;
                 }
                 htmlRows += `<tr><td>${v.name}</td><td>${v.value}</td></tr>`;
             }
-
-            const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-<style>
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #334155; margin: 0; padding: 20px; }
-h2 { color: #0f172a; border-bottom: 2px solid #6366f1; padding-bottom: 10px; font-size: 20px; margin-top: 0; }
-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; margin-top: 15px; }
-th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; word-wrap: break-word; white-space: pre-wrap; }
-th { background-color: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; width: 50%; font-size: 10px; letter-spacing: 0.05em; }
-.group-header td { background-color: #e0e7ff; color: #3730a3; font-weight: 700; font-size: 12px; text-transform: uppercase; padding: 12px; text-align: center; border-top: 1px solid #c7d2fe; border-bottom: 1px solid #c7d2fe; }
-.col-headers th { background-color: #f8fafc; border-bottom: 1px solid #cbd5e1; }
-</style>
-</head>
-<body>
-<h2>Environment Variables</h2>
-<table>
-  ${htmlRows}
-</table>
-</body>
-</html>`;
+            const htmlContent = `<html><head><style>body { font-family: sans-serif; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 5px; }</style></head><body><h2>Variables</h2><table>${htmlRows}</table></body></html>`;
             const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false, contextIsolation: true } });
             await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
-            const pdfData = await win.webContents.printToPDF({
-                printBackground: true,
-                landscape: true,
-                margins: { top: 1, bottom: 1, left: 1, right: 1 }
-            });
+            const pdfData = await win.webContents.printToPDF({ printBackground: true, landscape: true });
             fs.writeFileSync(filePath, pdfData);
             win.close();
-        } else if (format === 'docx') {
-            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } = require('docx');
 
-            const headerShading = { fill: "F1F5F9", type: ShadingType?.CLEAR || "clear", color: "auto" };
-            const groupShading = { fill: "E0E7FF", type: ShadingType?.CLEAR || "clear", color: "auto" };
-            const rowShading = { fill: "F8FAFC", type: ShadingType?.CLEAR || "clear", color: "auto" };
-            const cellMargins = { top: 150, bottom: 150, left: 150, right: 150 };
-
-            const tableRows = [];
-            let currentGroupDocx: string | undefined | null = null;
-            let rowIndex = 0;
-
-            for (const v of maskedVars) {
-                if (v.groupName !== currentGroupDocx) {
-                    currentGroupDocx = v.groupName;
-                    const groupTitle = currentGroupDocx || 'Ungrouped Variables';
-
-                    // Group Header Row
-                    tableRows.push(new TableRow({
-                        children: [
-                            new TableCell({
-                                children: [new Paragraph({ children: [new TextRun({ text: groupTitle.toUpperCase(), bold: true, color: "3730A3", size: 24 })], alignment: AlignmentType?.CENTER || "center" })],
-                                shading: groupShading,
-                                margins: { top: 250, bottom: 250, left: 150, right: 150 },
-                                columnSpan: 2
-                            })
-                        ]
-                    }));
-
-                    // Column Headers
-                    tableRows.push(new TableRow({
-                        tableHeader: true,
-                        children: [
-                            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "NAME", bold: true, color: "475569", size: 20 })] })], shading: headerShading, margins: cellMargins }),
-                            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "VALUE", bold: true, color: "475569", size: 20 })] })], shading: headerShading, margins: cellMargins })
-                        ]
-                    }));
-                    rowIndex = 0; // reset for alternating rows within group
-                }
-
-                // Data Row
-                tableRows.push(new TableRow({
-                    children: [
-                        new TableCell({ children: [new Paragraph(v.name)], margins: cellMargins, ...(rowIndex % 2 !== 0 && { shading: rowShading }) }),
-                        new TableCell({ children: [new Paragraph(v.value)], margins: cellMargins, ...(rowIndex % 2 !== 0 && { shading: rowShading }) })
-                    ]
-                }));
-                rowIndex++;
+            if (action === 'browser') {
+                shell.openExternal(url.pathToFileURL(filePath).toString());
+            } else if (action === 'editor') {
+                shell.openPath(filePath);
             }
-
+            return { success: true, filePath };
+        } else if (format === 'docx') {
+            const { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType } = require('docx');
+            const tableRows = maskedVars.map(v => new TableRow({
+                children: [
+                    new TableCell({ children: [new Paragraph(v.name)] }),
+                    new TableCell({ children: [new Paragraph(v.value)] })
+                ]
+            }));
             const doc = new Document({
                 sections: [{
-                    properties: {},
                     children: [
-                        new Paragraph({ children: [new TextRun({ text: "Environment Variables", bold: true, size: 36, color: "0F172A" })], spacing: { after: 300 } }),
-                        new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            columnWidths: [5000, 5000],
-                            rows: tableRows,
-                            borders: {
-                                top: { style: BorderStyle?.SINGLE || "single", size: 1, color: "E2E8F0" },
-                                bottom: { style: BorderStyle?.SINGLE || "single", size: 1, color: "E2E8F0" },
-                                left: { style: BorderStyle?.SINGLE || "single", size: 1, color: "E2E8F0" },
-                                right: { style: BorderStyle?.SINGLE || "single", size: 1, color: "E2E8F0" },
-                                insideHorizontal: { style: BorderStyle?.SINGLE || "single", size: 1, color: "E2E8F0" },
-                                insideVertical: { style: BorderStyle?.SINGLE || "single", size: 1, color: "E2E8F0" },
-                            }
-                        })
+                        new Paragraph({ text: "Environment Variables", heading: "Heading1" }),
+                        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows })
                     ]
                 }]
             });
-
             const buffer = await Packer.toBuffer(doc);
             fs.writeFileSync(filePath, buffer);
+            if (action === 'editor') shell.openPath(filePath);
+            return { success: true, filePath };
         }
-
-        if (format === 'json') {
-            const server = require('http').createServer((req: any, res: any) => {
-                res.setHeader('Content-Type', 'application/json');
-                res.end(require('fs').readFileSync(filePath));
-                // Keep server alive briefly to ensure browser fetches it
-                setTimeout(() => server.close(), 3000);
-            });
-            server.listen(0, '127.0.0.1', () => {
-                const port = server.address().port;
-                shell.openExternal(`http://127.0.0.1:${port}/export.json`);
-            });
-        } else if (['html', 'pdf'].includes(format)) {
-            const { pathToFileURL } = require('url');
-            await shell.openExternal(pathToFileURL(filePath).href);
-        } else {
-            await shell.openPath(filePath);
-        }
-
         return { success: true, filePath };
     } catch (err: any) {
         return { success: false, error: err.message };

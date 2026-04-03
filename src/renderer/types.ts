@@ -4,7 +4,7 @@ export interface ElectronAPI {
     createEnvVar: (name: string, value: string, isSystem?: boolean, isProtected?: boolean) => Promise<{ success: boolean; error?: string }>;
     updateEnvVar: (name: string, value: string, oldName?: string, isSystem?: boolean) => Promise<{ success: boolean; error?: string }>;
     deleteEnvVar: (name: string, isSystem?: boolean) => Promise<{ success: boolean; error?: string }>;
-    exportEnvVars: (vars: any[], format: string, isMasked: boolean, mode?: string, extraParam?: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+    exportEnvVars: (vars: any[], format: string, isMasked: boolean, mode?: string, extraParam?: string, action?: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
     importEnvVars: () => Promise<{ success: boolean; vars?: EnvVar[]; error?: string }>;
     getProtectedVars: () => Promise<string[]>;
     toggleProtectedVar: (name: string) => Promise<{ success: boolean; isProtected: boolean; error?: string }>;

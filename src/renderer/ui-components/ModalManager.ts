@@ -1100,12 +1100,11 @@ export class ModalManager {
         const close = () => overlay.classList.remove('active');
         if (closeBtn) closeBtn.onclick = close;
         if (cancelBtn) cancelBtn.onclick = close;
-        
-        if (saveBtn) {
-            saveBtn.onclick = async () => {
-                const currentMasked = maskCheckbox?.checked ?? isMasked;
-                let extra = '';
-                if (currentMode === 'github') {
+
+        const doExport = async (action: string) => {
+            const currentMasked = maskCheckbox?.checked ?? isMasked;
+            let extra = '';
+            if (currentMode === 'github') {
                     extra = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
                 } else if (currentMode === 'appsettings') {
                     const envInput = document.getElementById('appsettings-env-input') as HTMLInputElement;
@@ -1122,14 +1121,25 @@ export class ModalManager {
                         }
                     }
                 }
-                const res = await window.electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra);
+                const res = await (window as any).electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra, action);
                 if (res.success) {
-                    showToast('Exported successfully');
+                    if (action === 'save') showToast('Exported successfully');
                     close();
-                } else if (res.error !== 'cancelled') {
-                    showToast(`Export failed: ${res.error}`, 'error');
+                } else if (res.error !== 'Cancelled' && res.error !== 'cancelled') {
+                    showToast(res.error || 'Failed to export', 'error');
                 }
-            };
+        };
+
+        if (saveBtn) saveBtn.onclick = () => doExport('save');
+        
+        const browserBtn = $('export-action-browser');
+        if (browserBtn) {
+            browserBtn.onclick = () => doExport('browser');
+        }
+
+        const editorBtn = $('export-action-editor');
+        if (editorBtn) {
+            editorBtn.onclick = () => doExport('editor');
         }
 
         updatePreview();
