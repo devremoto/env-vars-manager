@@ -396,19 +396,48 @@ export class ModalManager {
         const btnCancel = $('import-review-cancel');
         const btnClose = $('import-review-modal-close');
         const btnReveal = $('btn-import-review-reveal');
+        
+        const prefixInput = $('import-prefix-input') as HTMLInputElement;
+        const groupByPrefixCheck = $('import-group-by-prefix') as HTMLInputElement;
+        const newSelectAll = $('import-new-select-all') as HTMLInputElement;
+        const existingSelectAll = $('import-existing-select-all') as HTMLInputElement;
 
         let isRevealed = false;
-        const newVars: EnvVar[] = [];
-        const existingVars: EnvVar[] = [];
+        let prefix = '';
 
-        vars.forEach(v => {
-            if (state.allEnvVars.some(ev => ev.name === v.name)) existingVars.push(v);
-            else newVars.push(v);
-        });
+        if (prefixInput) {
+            prefixInput.value = '';
+            prefixInput.oninput = () => {
+                prefix = prefixInput.value.trim();
+                renderLists();
+            };
+        }
+        
+        if (newSelectAll) {
+            newSelectAll.checked = true;
+            newSelectAll.onchange = () => {
+                const checks = newList.querySelectorAll('.import-new-check') as NodeListOf<HTMLInputElement>;
+                checks.forEach(c => c.checked = newSelectAll.checked);
+            };
+        }
+
+        if (existingSelectAll) {
+            existingSelectAll.checked = true;
+            existingSelectAll.onchange = () => {
+                const checks = existingList.querySelectorAll('.import-overwrite-check') as NodeListOf<HTMLInputElement>;
+                checks.forEach(c => c.checked = existingSelectAll.checked);
+            };
+        }
 
         const renderLists = () => {
             newList.innerHTML = '';
             existingList.innerHTML = '';
+            
+            const p = prefix ? `${prefix}__` : '';
+            
+            const newVars = vars.filter(v => !state.allEnvVars.some(ev => ev.name === (p + v.name)));
+            const existingVars = vars.filter(v => state.allEnvVars.some(ev => ev.name === (p + v.name)));
+
             newCountEl.textContent = newVars.length.toString();
             existingCountEl.textContent = existingVars.length.toString();
 
@@ -417,7 +446,20 @@ export class ModalManager {
                 item.className = 'import-review-item';
                 item.style.padding = '4px 8px';
                 item.style.fontSize = '12px';
-                item.innerHTML = `<strong>${v.name}</strong>: <span class="review-val" style="${isRevealed ? '' : 'filter:blur(3px)'}">${escapeHtml(v.value)}</span>`;
+                item.style.display = 'flex';
+                item.style.alignItems = 'center';
+                item.style.gap = '8px';
+                
+                const finalName = p + v.name;
+                const displayVal = isRevealed ? escapeHtml(v.value) : '********';
+                const blurStyle = isRevealed ? '' : 'filter:blur(3px); opacity:0.5;';
+
+                item.innerHTML = `
+                    <input type="checkbox" checked class="import-new-check" data-original-name="${v.name}" />
+                    <div style="flex:1">
+                        <strong>${finalName}</strong>: <span class="review-val" style="${blurStyle}">${displayVal}</span>
+                    </div>
+                `;
                 newList.appendChild(item);
             });
 
@@ -432,11 +474,17 @@ export class ModalManager {
                 item.style.border = '1px solid rgba(255, 152, 0, 0.2)';
                 item.style.borderRadius = '4px';
                 
+                const finalName = p + v.name;
+                const displayVal = isRevealed ? escapeHtml(v.value) : '********';
+                const blurStyle = isRevealed ? '' : 'filter:blur(3px); opacity:0.5;';
+                
                 item.innerHTML = `
-                    <input type="checkbox" checked class="import-overwrite-check" data-name="${v.name}" />
+                    <input type="checkbox" checked class="import-overwrite-check" data-original-name="${v.name}" />
                     <div style="flex:1">
-                        <div style="font-weight:bold; font-size:12px; color:var(--warning)">${v.name}</div>
-                        <div style="font-size:11px; opacity:0.8" class="review-val" style="${isRevealed ? '' : 'filter:blur(3px)'}">New: ${escapeHtml(v.value)}</div>
+                        <div style="font-weight:bold; font-size:12px; color:var(--warning)">${finalName}</div>
+                        <div style="font-size:11px; opacity:0.8; margin-top: 2px" class="review-val">
+                           <span style="${blurStyle}">New: ${displayVal}</span>
+                        </div>
                     </div>
                 `;
                 existingList.appendChild(item);
@@ -452,7 +500,8 @@ export class ModalManager {
         if (btnReveal) {
             btnReveal.onclick = () => {
                 isRevealed = !isRevealed;
-                $('import-review-reveal-label').textContent = isRevealed ? 'Hide' : 'Reveal';
+                const label = $('import-review-reveal-label');
+                if (label) label.textContent = isRevealed ? 'Hide' : 'Reveal';
                 renderLists();
             };
         }
@@ -462,17 +511,35 @@ export class ModalManager {
         btnClose.onclick = close;
 
         btnConfirm.onclick = async () => {
-            const checks = existingList.querySelectorAll('.import-overwrite-check:checked');
-            const toOverwrite = Array.from(checks).map(c => (c as HTMLInputElement).dataset.name);
+            const p = prefix ? `${prefix}__` : '';
+            const shouldGroup = groupByPrefixCheck?.checked && prefix;
             
-            const finalVars = [
-                ...newVars,
-                ...existingVars.filter(v => toOverwrite.includes(v.name))
-            ];
+            const newChecks = newList.querySelectorAll('.import-new-check:checked');
+            const overwriteChecks = existingList.querySelectorAll('.import-overwrite-check:checked');
+            
+            const toImport: EnvVar[] = [];
+            
+            newChecks.forEach(c => {
+                const origName = (c as HTMLInputElement).dataset.originalName;
+                const v = vars.find(x => x.name === origName);
+                if (v) toImport.push({ ...v, name: p + v.name });
+            });
+            
+            overwriteChecks.forEach(c => {
+                const origName = (c as HTMLInputElement).dataset.originalName;
+                const v = vars.find(x => x.name === origName);
+                if (v) toImport.push({ ...v, name: p + v.name });
+            });
 
-            if (finalVars.length > 0) {
+            if (toImport.length > 0) {
                 const { importService } = await import('../services/ImportService.js');
-                await importService.processImport(finalVars);
+                await importService.processImport(toImport);
+                
+                if (shouldGroup) {
+                    const names = toImport.map(v => v.name);
+                    const { groupingService } = await import('../services/GroupingService.js');
+                    await groupingService.createGroupFromList(prefix, names);
+                }
             }
             close();
         };

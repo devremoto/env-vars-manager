@@ -162,6 +162,24 @@ export class GroupingService {
         }
         showLoading(false);
     }
+    async createGroupFromList(groupName: string, varNames: string[]) {
+        if (!groupName || varNames.length < 2) return;
+
+        const newGroups: Record<string, string[]> = { ...state.groups };
+        
+        // Remove these variables from any other groups
+        Object.keys(newGroups).forEach(name => {
+            newGroups[name] = newGroups[name].filter(v => !varNames.includes(v));
+        });
+
+        // Add to new group
+        newGroups[groupName] = varNames;
+
+        const result = await window.electronAPI.saveGroups(newGroups);
+        if (result.success) {
+            await actionService.loadEnvVars(true);
+        }
+    }
 }
 
 export const groupingService = new GroupingService();

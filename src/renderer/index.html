@@ -309,15 +309,39 @@
                 <div style="margin-bottom: 20px; padding: 12px; background: rgba(var(--accent-rgb), 0.1); border-radius: 8px; font-size: 13px;">
                     We found <strong id="import-review-new-count">0</strong> new variables and <strong id="import-review-existing-count">0</strong> variables that will be updated.
                 </div>
+
+                <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Variable Prefix (Optional)</label>
+                        <input type="text" id="import-prefix-input" placeholder="e.g. MY_APP" style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Will be appended with <code style="color:var(--accent-primary)">__</code></div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; padding-top: 15px;">
+                        <input type="checkbox" id="import-group-by-prefix" style="width: 16px; height: 16px;">
+                        <label for="import-group-by-prefix" style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Group by Prefix</label>
+                    </div>
+                </div>
                 
                 <div class="review-sections" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
                     <div class="review-section">
-                        <h3 style="font-size: 12px; margin-bottom: 12px; color: var(--accent-primary);">ADD NEW</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h3 style="font-size: 12px; margin: 0; color: var(--accent-primary);">ADD NEW</h3>
+                            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
+                                <input type="checkbox" id="import-new-select-all" checked>
+                                <label for="import-new-select-all">All</label>
+                            </div>
+                        </div>
                         <div id="import-review-new-list" class="review-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: 4px; padding: 8px;"></div>
                         <div id="import-review-no-new" style="display: none; padding: 20px; text-align: center; font-size: 12px; color: var(--text-muted);">No new variables</div>
                     </div>
                     <div class="review-section">
-                        <h3 style="font-size: 12px; margin-bottom: 12px; color: var(--warning);">OVERWRITE EXISTING</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h3 style="font-size: 12px; margin: 0; color: var(--warning);">OVERWRITE EXISTING</h3>
+                            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
+                                <input type="checkbox" id="import-existing-select-all" checked>
+                                <label for="import-existing-select-all">All</label>
+                            </div>
+                        </div>
                         <div id="import-review-existing-list" class="review-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: 4px; padding: 8px;"></div>
                         <div id="import-review-no-existing" style="display: none; padding: 20px; text-align: center; font-size: 12px; color: var(--text-muted);">No overwrites</div>
                     </div>
