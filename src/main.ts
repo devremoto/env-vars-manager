@@ -682,7 +682,7 @@ ipcMain.handle('reset-app', async (): Promise<{ success: boolean; error?: string
 });
 
 // Export env vars
-ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard'): Promise<{ success: boolean; filePath?: string; error?: string }> => {
+ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = ''): Promise<{ success: boolean; filePath?: string; error?: string }> => {
     if (!mainWindow) return { success: false, error: 'No window' };
 
     let defaultExt = format;
@@ -738,6 +738,10 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             const lines: string[] = [];
             
             if (isWin && mode === 'standard') lines.push('@echo off');
+            if (mode === 'github') {
+                lines.push('echo Y | gh auth login --web --git-protocol https');
+                lines.push('');
+            }
 
             maskedVars.forEach(v => {
                 const name = v.name;
@@ -756,6 +760,9 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                      line = `az configure --defaults ${name}="${val}"`;
                 } else if (mode === 'terraform') {
                      line = `${name.toLowerCase()} = "${val}"`;
+                } else if (mode === 'github') {
+                     const repoFlag = extraParam ? ` --repo ${extraParam}` : '';
+                     line = `gh secret set ${name} -b"${val}"${repoFlag}`;
                 }
 
                 if (v.isProtected && isMasked) {
@@ -768,6 +775,16 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                     lines.push(line);
                 }
             });
+
+            // Add pause at the end (unless it's a .tfvars file)
+            if (mode !== 'terraform') {
+                lines.push('');
+                if (isWin) {
+                    lines.push('pause');
+                } else {
+                    lines.push('read -p "Press any key to continue..."');
+                }
+            }
 
             fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
             shell.openPath(filePath);

@@ -921,7 +921,20 @@ export class ModalManager {
             const sample = vars.slice(0, 3);
             let text = '';
             const isWin = navigator.userAgent.toLowerCase().includes('win');
+            const githubOptions = $('github-options-container');
+            const githubInput = $('github-repo-input') as HTMLInputElement;
+
+            if (githubOptions) {
+                githubOptions.style.display = currentMode === 'github' ? 'block' : 'none';
+            }
+
+            const repo = githubInput?.value || '';
+            const repoFlag = repo ? ` --repo ${repo}` : '';
             
+            if (currentMode === 'github') {
+                text += `echo Y | gh auth login --web --git-protocol https\n\n`;
+            }
+
             sample.forEach(v => {
                 const val = (v.isProtected && isMasked) ? '********' : v.value;
                 if (currentMode === 'standard') {
@@ -932,11 +945,29 @@ export class ModalManager {
                     text += `az configure --defaults ${v.name}="${val}"\n`;
                 } else if (currentMode === 'terraform') {
                     text += `export TF_VAR_${v.name.toLowerCase()}="${val}"\n`;
+                } else if (currentMode === 'github') {
+                    text += `gh secret set ${v.name} -b"${val}"${repoFlag}\n`;
                 }
             });
+
+            // Add pause to preview (unless it's terraform-style)
+            if (currentMode !== 'terraform') {
+                text += '\n';
+                if (isWin) {
+                    text += `pause\n`;
+                } else {
+                    text += `read -p "Press any key to continue..."\n`;
+                }
+            }
+
             if (vars.length > 3) text += `# ... and ${vars.length - 3} more`;
             if (preview) preview.textContent = text;
         };
+
+        const githubRepoInput = $('github-repo-input');
+        if (githubRepoInput) {
+            githubRepoInput.oninput = updatePreview;
+        }
 
         modeButtons.forEach(btn => {
             (btn as HTMLElement).onclick = () => {
@@ -953,7 +984,8 @@ export class ModalManager {
         
         if (saveBtn) {
             saveBtn.onclick = async () => {
-                const res = await window.electronAPI.exportEnvVars(vars, 'script', isMasked, currentMode);
+                const githubRepo = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
+                const res = await window.electronAPI.exportEnvVars(vars, 'script', isMasked, currentMode, githubRepo);
                 if (res.success) {
                     showToast('Script exported successfully');
                     close();

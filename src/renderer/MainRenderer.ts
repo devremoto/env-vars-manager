@@ -200,13 +200,16 @@ export class MainRenderer {
                 const format = el.getAttribute('data-format');
                 const isMasked = (document.getElementById('export-mask-checkbox') as HTMLInputElement)?.checked ?? false;
                 
-                if (format === 'script') {
-                    e.stopPropagation(); // Stop general close to open other modal
-                    this.modalManager.openScriptExportModal(state.filteredVars, isMasked);
-                    const menu = document.getElementById('export-dropdown-menu');
-                    if (menu) menu.style.display = 'none';
-                } else if (format) {
-                    window.electronAPI.exportEnvVars(state.filteredVars, format, isMasked);
+                if (format) {
+                    const varsToExport = this.getVarsToExport();
+
+                    if (format === 'script') {
+                        e.stopPropagation(); 
+                        this.modalManager.openScriptExportModal(varsToExport, isMasked);
+                    } else {
+                        window.electronAPI.exportEnvVars(varsToExport, format, isMasked);
+                    }
+
                     const menu = document.getElementById('export-dropdown-menu');
                     if (menu) menu.style.display = 'none';
                 }
@@ -249,6 +252,56 @@ export class MainRenderer {
         $('header-name').onclick = () => handleSort('name');
         $('header-value').onclick = () => handleSort('value');
         $('header-protected').onclick = () => handleSort('protected');
+    }
+
+    private getVarsToExport(): any[] {
+        const selectedFromFolders = new Set<string>();
+        if (state.selectedFolders.size > 0) {
+            state.selectedFolders.forEach(folderPath => {
+                const parts = folderPath.split('/');
+                state.allEnvVars.forEach(v => {
+                    const vParts = splitVarName(v.name);
+                    // Check if vParts starts with parts
+                    if (vParts.length >= parts.length) {
+                        const match = parts.every((p, i) => vParts[i] === p);
+                        if (match) selectedFromFolders.add(v.name);
+                    }
+                });
+            });
+        }
+
+        const allSelectedNames = new Set([...state.selectedVars, ...selectedFromFolders]);
+
+        if (allSelectedNames.size > 0) {
+            // Apply current sorting preference to selected export
+            const selectedVars = state.allEnvVars
+                .filter(v => allSelectedNames.has(v.name))
+                .sort((a, b) => {
+                    let valA: any = '';
+                    let valB: any = '';
+                    if (state.sortBy === 'name') {
+                        valA = a.name;
+                        valB = b.name;
+                    } else if (state.sortBy === 'value') {
+                        valA = a.value || '';
+                        valB = b.value || '';
+                    } else if (state.sortBy === 'protected') {
+                        valA = state.protectedVars.has(a.name) ? 1 : 0;
+                        valB = state.protectedVars.has(b.name) ? 1 : 0;
+                    }
+                    if (valA < valB) return state.sortOrder === 'asc' ? -1 : 1;
+                    if (valA > valB) return state.sortOrder === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+            return selectedVars.map(v => ({
+                ...v,
+                isProtected: state.protectedVars.has(v.name),
+                groupName: Object.entries(state.groups).find(([_, names]) => names.includes(v.name))?.[0]
+            }));
+        }
+        
+        return state.filteredVars;
     }
 
     private initResizablePanels() {
