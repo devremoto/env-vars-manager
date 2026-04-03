@@ -18,27 +18,39 @@ export class GroupingService {
 
             const newGroups: Record<string, string[]> = { ...state.groups };
             let addedCount = 0;
+            let updatedCount = 0;
 
             Object.entries(prefixMap).forEach(([prefix, names]) => {
-                if (names.length >= 2) {
-                    const groupName = prefix;
-                    if (!state.groups[groupName]) {
-                        newGroups[groupName] = names;
-                        addedCount++;
+                const groupName = prefix;
+                const existingVars = state.groups[groupName];
+                
+                if (existingVars) {
+                    // Group exists, check for new variables with this prefix that aren't in it yet
+                    const toAdd = names.filter(n => !existingVars.includes(n));
+                    if (toAdd.length > 0) {
+                        newGroups[groupName] = [...existingVars, ...toAdd];
+                        updatedCount++;
                     }
+                } else if (names.length >= 2) {
+                    // New group
+                    newGroups[groupName] = names;
+                    addedCount++;
                 }
             });
 
-            if (addedCount > 0) {
+            if (addedCount > 0 || updatedCount > 0) {
                 const result = await window.electronAPI.saveGroups(newGroups);
                 if (result.success) {
-                    showToast(`Created ${addedCount} auto-groups`);
+                    let msg = '';
+                    if (addedCount > 0) msg += `Created ${addedCount} groups. `;
+                    if (updatedCount > 0) msg += `Updated ${updatedCount} groups (added untracked variables).`;
+                    showToast(msg.trim());
                     await actionService.loadEnvVars(true);
                 } else {
                     showToast('Failed to save groups', 'error');
                 }
             } else {
-                showToast('No new groups identified');
+                showToast('No new groups or variables identified');
             }
         } finally {
             showLoading(false);
@@ -48,28 +60,36 @@ export class GroupingService {
     async createGroupFromSelection(groupName: string) {
         if (!groupName) return;
         const selectedNames = Array.from(state.selectedVars);
-        if (selectedNames.length < 2) {
-            showToast('Select at least 2 variables to group', 'warning');
-            return;
+        
+        // Allow adding single variables if the group already exists
+        const exists = !!state.groups[groupName];
+        if (!exists && selectedNames.length < 2) {
+             showToast('Select at least 2 variables to create a new group', 'warning');
+             return;
         }
 
+        const newGroups: Record<string, string[]> = { ...state.groups };
+        
         // Remove these variables from any other groups they might belong to
-        const newGroups: Record<string, string[]> = {};
         Object.entries(state.groups).forEach(([name, vars]) => {
             newGroups[name] = vars.filter(v => !selectedNames.includes(v));
         });
 
-        // Add to new group
-        newGroups[groupName] = selectedNames;
+        // Add or Merge to the target group
+        if (newGroups[groupName]) {
+            newGroups[groupName] = [...newGroups[groupName], ...selectedNames];
+        } else {
+            newGroups[groupName] = selectedNames;
+        }
 
-        showLoading(true, 'Creating group...');
+        showLoading(true, exists ? `Updating group "${groupName}"...` : 'Creating group...');
         const result = await window.electronAPI.saveGroups(newGroups);
         if (result.success) {
-            showToast(`Group "${groupName}" created`);
+            showToast(exists ? `Group "${groupName}" updated` : `Group "${groupName}" created`);
             state.selectedVars.clear();
             await actionService.loadEnvVars(true);
         } else {
-            showToast(result.error || 'Failed to create group', 'error');
+            showToast(result.error || 'Failed to save group', 'error');
         }
         showLoading(false);
     }
@@ -163,7 +183,7 @@ export class GroupingService {
         showLoading(false);
     }
     async createGroupFromList(groupName: string, varNames: string[]) {
-        if (!groupName || varNames.length < 2) return;
+        if (!groupName) return;
 
         const newGroups: Record<string, string[]> = { ...state.groups };
         
@@ -172,8 +192,12 @@ export class GroupingService {
             newGroups[name] = newGroups[name].filter(v => !varNames.includes(v));
         });
 
-        // Add to new group
-        newGroups[groupName] = varNames;
+        // Add or Merge
+        if (newGroups[groupName]) {
+            newGroups[groupName] = [...newGroups[groupName], ...varNames];
+        } else {
+            newGroups[groupName] = varNames;
+        }
 
         const result = await window.electronAPI.saveGroups(newGroups);
         if (result.success) {
