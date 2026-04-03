@@ -705,6 +705,33 @@ input[type="checkbox"]:indeterminate::before {
   background: var(--bg-active);
 }
 
+/* Nested row visual aid */
+.var-row.row-child {
+  background: rgba(124, 106, 255, 0.02);
+}
+
+.var-row.row-child td:first-child {
+  padding-left: 28px;
+}
+
+.var-row.row-child .name-cell {
+  position: relative;
+  padding-left: 16px;
+}
+
+.var-row.row-child .name-cell::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -15px;
+  bottom: 50%;
+  width: 10px;
+  border-left: 1.5px solid var(--border-accent);
+  border-bottom: 1.5px solid var(--border-accent);
+  border-bottom-left-radius: 4px;
+  opacity: 0.4;
+}
+
 /* Protected row visual aid — subtle green left accent */
 .var-row.row-protected td:first-child {
   border-left: 3px solid #4CAF50;

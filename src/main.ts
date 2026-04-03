@@ -516,6 +516,36 @@ ipcMain.handle('update-env-var', async (_event: any, name: string, value: string
             updateShellProfile(profilePath, name, value);
         }
 
+        if (oldName && oldName !== name) {
+            // Update protected vars list
+            let protectedList = getProtectedVarsList();
+            if (protectedList.includes(oldName)) {
+                protectedList = protectedList.filter(n => n !== oldName);
+                if (!protectedList.includes(name)) protectedList.push(name);
+                fs.writeFileSync(protectedVarsPath, JSON.stringify(protectedList, null, 2), 'utf-8');
+            }
+
+            // Update groups
+            try {
+                if (fs.existsSync(groupsPath)) {
+                    const groupsData = JSON.parse(fs.readFileSync(groupsPath, 'utf-8'));
+                    let groupsChanged = false;
+                    Object.keys(groupsData).forEach(groupName => {
+                        const vars = groupsData[groupName];
+                        if (vars.includes(oldName)) {
+                            groupsData[groupName] = vars.map((v: string) => v === oldName ? name : v);
+                            groupsChanged = true;
+                        }
+                    });
+                    if (groupsChanged) {
+                        fs.writeFileSync(groupsPath, JSON.stringify(groupsData, null, 2), 'utf-8');
+                    }
+                }
+            } catch (e) {
+                console.error('Error updating groups during rename:', e);
+            }
+        }
+
         // Immediately mutate the internal Node process environment
         process.env[name] = value;
         if (oldName && oldName !== name) delete process.env[oldName];

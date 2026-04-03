@@ -112,7 +112,7 @@ export class ModalManager {
         this.varNameInput.value = v ? v.name : '';
         this.varValueInput.value = displayValue;
         this.varProtectedInput.checked = isProtected;
-        this.varNameInput.disabled = !!v;
+        this.varNameInput.disabled = false; // Allow rename
 
         if (isMulti && multiContainer) {
             this.varValueInput.style.display = 'none';
@@ -250,7 +250,8 @@ export class ModalManager {
             return;
         }
 
-        const success = await actionService.saveVariable(name, value, false);
+        const isSystem = state.editingVar ? !!state.editingVar.isSystem : false;
+        const success = await actionService.saveVariable(name, value, isSystem);
         if (success) {
             if (isProtected) {
                 await window.electronAPI.protectVars([name], true);
