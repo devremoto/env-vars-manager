@@ -28,23 +28,38 @@ export class MainRenderer {
         debugLog('ContextMenu initialized');
 
         // Register globals for cross-component calls (temp during refactor)
+        (window as any).explorer = this.explorer;
+        (window as any).modalManager = this.modalManager;
         (window as any).openEditModal = (v: any) => this.modalManager.openEditModal(v);
         (window as any).openViewModal = (v: any) => this.modalManager.openViewModal(v);
         (window as any).openCloneModal = (v: any) => { if (v) this.modalManager.openCloneModal(v); };
         (window as any).openHistoryModal = (name?: string) => this.modalManager.openHistoryModal(name);
         (window as any).openOptimizeModal = (name: string) => this.modalManager.openOptimizeModal(name);
-        (window as any).openImportReviewModal = (vars: any) => this.modalManager.openImportReviewModal(vars);
+        (window as any).openImportReviewModal = (vars: any, options?: any) => this.modalManager.openImportReviewModal(vars, options);
         
         (window as any).openDeleteConfirm = (names: string[]) => {
             const count = names.length;
+            if (count === 0) return;
+
             const message = count === 1 
                 ? `Are you sure you want to delete "${names[0]}"?`
                 : `Are you sure you want to delete ${count} items? (${names.slice(0, 3).join(', ')}${count > 3 ? '...' : ''})`;
             
             this.modalManager.openConfirmModal(
                 message,
-                () => {
-                    names.forEach(n => actionService.deleteVariable(n));
+                async () => {
+                    showToast(`Deleting ${count} items...`);
+                    let successCount = 0;
+                    for (const name of names) {
+                        const v = getVarById(name);
+                        const res = await window.electronAPI.deleteEnvVar(name, v?.isSystem || false);
+                        if (res.success) successCount++;
+                    }
+                    showToast(`Deleted ${successCount} variables`);
+                    await actionService.loadEnvVars(true);
+                    state.selectedVars.clear();
+                    state.selectedFolders.clear();
+                    state.notify();
                 }
             );
         };
@@ -65,6 +80,12 @@ export class MainRenderer {
             debugLog('OS Info loaded');
             await actionService.loadEnvVars();
             debugLog('Env Vars loaded');
+            // Load saved view preference
+            const savedView = localStorage.getItem('env-vars-view');
+            if (savedView === 'list' || savedView === 'folder') {
+                state.currentView = savedView;
+            }
+
             state.subscribe(() => this.render());
             this.render();
             debugLog('Initial render complete');
@@ -102,10 +123,12 @@ export class MainRenderer {
         // View switches
         $('view-list').onclick = () => {
             state.currentView = 'list';
+            localStorage.setItem('env-vars-view', 'list');
             state.notify();
         };
         $('view-folder').onclick = () => {
             state.currentView = 'folder';
+            localStorage.setItem('env-vars-view', 'folder');
             state.notify();
         };
 
@@ -124,20 +147,40 @@ export class MainRenderer {
             const names = Array.from(state.selectedVars);
             if (names.length > 0) (window as any).openDeleteConfirm(names);
         };
-        $('btn-delete-bulk').onclick = () => {
-            const names = Array.from(state.selectedVars);
-            if (names.length > 0) (window as any).openDeleteConfirm(names);
-        };
         $('btn-group').onclick = () => this.modalManager.openGroupModal();
 
         // Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'c') {
+            const isCtrl = e.ctrlKey || e.metaKey;
+            
+            // Key identification
+            const key = e.key.toLowerCase();
+
+            if (isCtrl && key === 'c') {
                 clipboardService.copySelected();
-            } else if (e.ctrlKey && e.key === 'v') {
+            } else if (isCtrl && key === 'v') {
                 clipboardService.paste();
-            } else if (e.key === 'Delete') {
+            } else if (key === 'delete') {
                 this.handleDeleteKey();
+            } else if (isCtrl && key === 'a') {
+                // Ignore if in input
+                if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+                
+                e.preventDefault();
+                if (state.currentView === 'folder') {
+                    this.explorer.selectAll();
+                } else {
+                    this.tableView.selectAll();
+                }
+            } else if (isCtrl && key === 'u') {
+                e.preventDefault();
+                state.selectedVars.clear();
+                state.selectedFolders.clear();
+                state.selectedExplorerVar = null;
+                state.notify();
+                this.explorer.updateDetailsPanel(); // Clear details pane 
+                (window as any).updateToolbarButtons();
+                this.render();
             }
         });
 

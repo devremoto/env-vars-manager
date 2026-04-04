@@ -1384,8 +1384,34 @@ body.modal-open .app-container {
 }
 
 .explorer-tile.selected {
-    background: rgba(0, 120, 215, 0.2);
+    background: rgba(0, 120, 215, 0.15);
     border: 1px solid rgba(0, 120, 215, 0.4);
+    box-shadow: inset 0 0 0 1px rgba(124, 106, 255, 0.2);
+}
+
+.explorer-tile.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: var(--accent-primary);
+    color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    z-index: 5;
+    animation: badgePop 0.15s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+@keyframes badgePop {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 
 .explorer-tile-icon {

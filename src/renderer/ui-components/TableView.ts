@@ -170,7 +170,15 @@ export class TableView {
         }
 
         // Listeners for group row
-        groupRow.querySelector('.group-info')!.addEventListener('click', () => {
+        groupRow.querySelector('.group-toggle')!.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (state.collapsedGroups.has(group.groupName)) state.collapsedGroups.delete(group.groupName);
+            else state.collapsedGroups.add(group.groupName);
+            this.render();
+        });
+
+        groupRow.querySelector('.group-info')!.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (state.collapsedGroups.has(group.groupName)) state.collapsedGroups.delete(group.groupName);
             else state.collapsedGroups.add(group.groupName);
             this.render();

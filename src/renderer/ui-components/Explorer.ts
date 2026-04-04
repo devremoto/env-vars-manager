@@ -113,6 +113,14 @@ export class Explorer {
         this.explorerContent.addEventListener('mousedown', (e) => this.handleMarqueeDown(e));
         document.addEventListener('mousemove', (e) => this.handleMarqueeMove(e));
         document.addEventListener('mouseup', () => this.handleMarqueeUp());
+
+        // Context menu for empty area
+        this.explorerContent.addEventListener('contextmenu', (e) => {
+            if (!(e.target as HTMLElement).closest('.explorer-tile')) {
+                const currentFolderPath = state.explorerPath.join('/');
+                (window as any).contextMenu.show(e, currentFolderPath, false, false, true);
+            }
+        });
     }
 
     render() {
@@ -440,23 +448,41 @@ export class Explorer {
             
             const allItems = Array.from(this.explorerContent.querySelectorAll('.explorer-tile.folder'));
             const currentIndex = allItems.findIndex(el => (el as HTMLElement).title === name);
+            const isAlreadySelected = state.selectedFolders.has(name);
 
             if (isShift && this.lastSelectedIndex !== -1) {
                 const start = Math.min(this.lastSelectedIndex, currentIndex);
                 const end = Math.max(this.lastSelectedIndex, currentIndex);
-                if (!isCtrl) state.selectedFolders.clear();
+                if (!isCtrl) {
+                    state.selectedFolders.clear();
+                    state.selectedVars.clear();
+                }
                 for (let i = start; i <= end; i++) {
                     const fName = (allItems[i] as HTMLElement).title;
-                    if (fName) state.selectedFolders.add(fName);
+                    if (fName) {
+                        state.selectedFolders.add(fName);
+                        this.selectAllInFolder(fName, true);
+                    }
                 }
             } else if (isCtrl) {
-                if (state.selectedFolders.has(name)) state.selectedFolders.delete(name);
-                else state.selectedFolders.add(name);
+                if (isAlreadySelected) {
+                    state.selectedFolders.delete(name);
+                    this.selectAllInFolder(name, false);
+                } else {
+                    state.selectedFolders.add(name);
+                    this.selectAllInFolder(name, true);
+                }
                 this.lastSelectedIndex = currentIndex;
             } else {
-                state.selectedFolders.clear();
-                state.selectedVars.clear();
-                state.selectedFolders.add(name);
+                if (isAlreadySelected) {
+                    state.selectedFolders.delete(name);
+                    this.selectAllInFolder(name, false);
+                } else {
+                    state.selectedFolders.clear();
+                    state.selectedVars.clear();
+                    state.selectedFolders.add(name);
+                    this.selectAllInFolder(name, true);
+                }
                 this.lastSelectedIndex = currentIndex;
             }
             
@@ -476,7 +502,10 @@ export class Explorer {
         this.startX = e.clientX;
         this.startY = e.clientY;
 
-        if (!e.ctrlKey) state.selectedVars.clear();
+        if (!e.ctrlKey) {
+            state.selectedVars.clear();
+            state.selectedFolders.clear();
+        }
 
         this.selectionRect = document.createElement('div');
         this.selectionRect.style.cssText = 'position: fixed; border: 1px solid var(--accent-primary); background: rgba(124, 106, 255, 0.15); pointer-events: none; z-index: 9999;';
@@ -501,19 +530,29 @@ export class Explorer {
 
         // Check intersections
         const rect = this.selectionRect.getBoundingClientRect();
-        const tiles = this.explorerContent.querySelectorAll('.explorer-tile.file');
+        const tiles = this.explorerContent.querySelectorAll('.explorer-tile');
         
         tiles.forEach(tile => {
             const tileRect = tile.getBoundingClientRect();
-            // Check if tile overlaps with marquee rectangle
             const intersects = !(rect.right < tileRect.left || rect.left > tileRect.right || rect.bottom < tileRect.top || rect.top > tileRect.bottom);
             const name = (tile as HTMLElement).title;
+            const isFolder = tile.classList.contains('folder');
             
             if (intersects) {
-                state.selectedVars.add(name);
+                if (isFolder) {
+                    state.selectedFolders.add(name);
+                    this.selectAllInFolder(name, true);
+                } else {
+                    state.selectedVars.add(name);
+                }
                 tile.classList.add('selected');
             } else if (!e.ctrlKey) {
-                state.selectedVars.delete(name);
+                if (isFolder) {
+                    state.selectedFolders.delete(name);
+                    this.selectAllInFolder(name, false);
+                } else {
+                    state.selectedVars.delete(name);
+                }
                 tile.classList.remove('selected');
             }
         });
@@ -612,7 +651,7 @@ export class Explorer {
         return current;
     }
 
-    private updateDetailsPanel(variable?: EnvVar) {
+    public updateDetailsPanel(variable?: EnvVar) {
         // Handle Multiple Selection
         if (state.selectedVars.size > 1) {
             this.detailsContent.style.display = 'block';
@@ -789,15 +828,55 @@ export class Explorer {
 
     public selectAll() {
         const node = this.getCurrentFolderNode();
+        
+        // Select all folders in current view
+        const folderKeys = Object.keys(node).filter(k => k !== '__vars__' && k !== '__all_protected__');
+        folderKeys.forEach(name => {
+            const fullPath = [...state.explorerPath, name].join('/');
+            state.selectedFolders.add(fullPath);
+            this.selectAllInFolder(fullPath, true);
+        });
+
+        // Select all variables in current view
         const varsInFolder = (node.__vars__ || []) as EnvVar[];
+        varsInFolder.forEach(v => state.selectedVars.add(v.name));
         
         if (varsInFolder.length > 0) {
-            varsInFolder.forEach(v => state.selectedVars.add(v.name));
             state.selectedExplorerVar = varsInFolder[varsInFolder.length - 1].name;
-            
-            (window as any).updateToolbarButtons();
-            this.renderContent();
-            this.updateDetailsPanel(state.selectedVars.size > 1 ? undefined : varsInFolder[varsInFolder.length - 1]);
+        } else if (folderKeys.length > 0) {
+            state.selectedExplorerVar = [...state.explorerPath, folderKeys[folderKeys.length - 1]].join('/');
         }
+
+        (window as any).updateToolbarButtons();
+        this.renderContent();
+        
+        const lastVar = varsInFolder.length > 0 ? varsInFolder[varsInFolder.length - 1] : undefined;
+        this.updateDetailsPanel(state.selectedVars.size > 1 ? undefined : lastVar);
+    }
+
+    private selectAllInFolder(folderPath: string, select: boolean = true) {
+        if (!folderPath) return;
+        const tree = this.buildFolderTree();
+        const parts = folderPath.split('/').filter(p => !!p);
+        let current = tree;
+        for (const p of parts) {
+            if (current[p]) current = current[p];
+            else return;
+        }
+
+        const processRecursive = (node: any) => {
+            if (node.__vars__) {
+                node.__vars__.forEach((v: EnvVar) => {
+                    if (select) state.selectedVars.add(v.name);
+                    else state.selectedVars.delete(v.name);
+                });
+            }
+            Object.keys(node).forEach(key => {
+                if (key !== '__vars__' && key !== '__all_protected__') {
+                    processRecursive(node[key]);
+                }
+            });
+        };
+        processRecursive(current);
     }
 }

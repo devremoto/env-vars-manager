@@ -5,6 +5,9 @@ import { clipboardService } from '../services/ClipboardService.js';
 
 export class ContextMenu {
     private menu = $('context-menu');
+    private isFolder = false;
+    private targetName = '';
+
 
     constructor() {
         this.setupListeners();
@@ -33,18 +36,31 @@ export class ContextMenu {
         $('menu-folder-rename').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-rename'); };
         $('menu-folder-autoprotect').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-autoprotect'); };
         $('menu-folder-ungroup').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-ungroup'); };
+
+        // General Area Specific
+        $('menu-general-add').onclick = (e) => { e.stopPropagation(); this.handleAction('general-add'); };
     }
 
-    show(e: MouseEvent, targetName: string, isFolder: boolean = false, isFolderAllProtected: boolean = false) {
+    show(e: MouseEvent, targetName: string, isFolder: boolean = false, isFolderAllProtected: boolean = false, isGeneral: boolean = false) {
         e.preventDefault();
+        this.targetName = targetName;
+        this.isFolder = isFolder;
         state.selectedExplorerVar = targetName;
         
         // Toggle menu items based on type
         const varActions = document.querySelectorAll('.context-menu .var-action');
         const folderActions = document.querySelectorAll('.context-menu .folder-action');
+        const generalActions = document.querySelectorAll('.context-menu .general-action');
         
-        varActions.forEach(el => (el as HTMLElement).style.display = isFolder ? 'none' : 'flex');
+        varActions.forEach(el => (el as HTMLElement).style.display = (isFolder || isGeneral) ? 'none' : 'flex');
         folderActions.forEach(el => (el as HTMLElement).style.display = isFolder ? 'flex' : 'none');
+        generalActions.forEach(el => (el as HTMLElement).style.display = isGeneral ? 'flex' : 'none');
+
+        // Hide delete and separator for general context
+        const deleteItem = $('menu-delete');
+        const separator = document.querySelector('.context-menu .menu-sep') as HTMLElement;
+        if (deleteItem) deleteItem.style.display = isGeneral ? 'none' : 'flex';
+        if (separator) separator.style.display = isGeneral ? 'none' : 'flex';
 
         if (!isFolder) {
             const v = getVarById(targetName);
@@ -105,6 +121,15 @@ export class ContextMenu {
         this.hide();
         
         const getVarsToProcess = () => {
+            if (this.isFolder) {
+                // If we right-clicked a folder, we want to process all variables under it
+                const fullPath = [...state.explorerPath, name];
+                return state.allEnvVars.filter(v => {
+                    const parts = splitVarName(v.name);
+                    return fullPath.every((p, i) => parts[i] === p);
+                });
+            }
+
             const selected = Array.from(state.selectedVars).map(n => getVarById(n)).filter(v => !!v) as any[];
             if (selected.length > 0 && Array.from(state.selectedVars).includes(name)) return selected;
             const single = getVarById(name);
@@ -166,6 +191,9 @@ export class ContextMenu {
                 break;
             case 'folder-ungroup':
                 import('../services/GroupingService.js').then(m => m.groupingService.ungroup(name));
+                break;
+            case 'general-add':
+                (window as any).openEditModal({ name: state.explorerPath.length > 0 ? `${state.explorerPath.join('_')}_` : '', value: '' });
                 break;
         }
     }
