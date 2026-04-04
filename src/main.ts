@@ -834,8 +834,16 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
         filePath = path.join(os.tmpdir(), `env-vars-export_${Date.now()}.${defaultExt}`);
     }
 
-    // Default actions if not provided
-    const finalAction = action || (['html', 'pdf'].includes(format) ? 'browser' : 'editor');
+    // Specific rules for format/action associations
+    let finalAction = action;
+    if (!finalAction) {
+        finalAction = (['html', 'pdf'].includes(format)) ? 'browser' : 'editor';
+    }
+
+    // Force DOCX to editor always if not save
+    if (format === 'docx' && finalAction === 'browser') {
+        finalAction = 'editor';
+    }
 
     try {
         // Filter out protected variables if requested

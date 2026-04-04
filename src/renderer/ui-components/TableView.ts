@@ -95,7 +95,7 @@ export class TableView {
 
     private renderGroup(group: { groupName: string, vars: EnvVar[], isCollapsed: boolean }) {
         const groupRow = document.createElement('tr');
-        groupRow.className = 'group-header-row';
+        groupRow.className = 'group-row';
         groupRow.id = `group-${group.groupName}`;
         
         const allSelected = group.vars.every(v => state.selectedVars.has(v.name));
@@ -103,6 +103,8 @@ export class TableView {
 
         const allProtected = group.vars.every(v => state.protectedVars.has(v.name));
         const someProtected = !allProtected && group.vars.some(v => state.protectedVars.has(v.name));
+        const anyProtected = allProtected || someProtected;
+        groupRow.className = `group-row ${allProtected ? 'row-protected' : (someProtected ? 'row-partial-protected' : 'row-unprotected')}`;
         const anyOptimizable = group.vars.some(v => v.canOptimize);
 
         groupRow.innerHTML = `
@@ -166,7 +168,10 @@ export class TableView {
         this.tableBody.appendChild(groupRow);
 
         if (!group.isCollapsed) {
-            group.vars.forEach(v => this.renderRow(v, true));
+            group.vars.forEach((v, idx) => {
+                const isLast = idx === group.vars.length - 1;
+                this.renderRow(v, true, isLast);
+            });
         }
 
         // Listeners for group row
@@ -236,12 +241,12 @@ export class TableView {
         });
     }
 
-    private renderRow(v: EnvVar, isInsideGroup: boolean = false) {
+    private renderRow(v: EnvVar, isInsideGroup: boolean = false, isLastInGroup: boolean = false) {
         const isProtectedVar = isProtected(v.name);
         const isRevealed = state.revealedVars.has(v.name);
 
         const row = document.createElement('tr');
-        row.className = `var-row ${isInsideGroup ? 'row-child' : ''} ${state.selectedVars.has(v.name) ? 'selected' : ''} ${isProtectedVar ? 'row-protected' : ''}`;
+        row.className = `var-row ${isInsideGroup ? 'row-child' : ''} ${isLastInGroup ? 'group-last-row' : ''} ${state.selectedVars.has(v.name) ? 'selected' : ''} ${isProtectedVar ? 'row-protected' : 'row-unprotected'}`;
         row.dataset.id = v.name;
         
         const displayValue = getMaskedValue(v.name, v.value, isRevealed);
@@ -319,13 +324,16 @@ export class TableView {
             this.toggleSelect(v.name, (e.target as HTMLInputElement).checked);
         });
 
-        if (isProtected) {
-            row.querySelector('.btn-reveal')!.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (state.revealedVars.has(v.name)) state.revealedVars.delete(v.name);
-                else state.revealedVars.add(v.name);
-                this.render();
-            });
+        if (isProtectedVar) {
+            const revealBtn = row.querySelector('.btn-reveal');
+            if (revealBtn) {
+                revealBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (state.revealedVars.has(v.name)) state.revealedVars.delete(v.name);
+                    else state.revealedVars.add(v.name);
+                    this.render();
+                });
+            }
         }
 
         // Let renderer handle these for now via delegation or global emitter
