@@ -1027,11 +1027,12 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             }
             const htmlContent = `<!DOCTYPE html><html><head><style>body { font-family: sans-serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 8px; text-align: left; } .group-header { background: #eee; font-weight: bold; }</style></head><body><h2>Environment Variables</h2><table>${htmlRows}</table></body></html>`;
             
-            if (finalAction === 'browser') {
-                openInBrowserWithLocalServer(htmlContent, 'text/html', 'variables.html');
-            } else {
-                fs.writeFileSync(filePath, htmlContent, 'utf-8');
-                if (finalAction === 'editor') shell.openPath(filePath);
+            // We always write the file if it's meant to be opened or saved
+            fs.writeFileSync(filePath, htmlContent, 'utf-8');
+
+            const actualAction = (finalAction === 'editor' || finalAction === 'browser') ? 'browser' : 'save';
+            if (actualAction === 'browser') {
+                shell.openExternal(url.pathToFileURL(filePath).toString());
             }
             return { success: true, filePath };
         } else if (format === 'pdf') {
@@ -1052,11 +1053,10 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             fs.writeFileSync(filePath, pdfData);
             win.close();
 
-            if (finalAction === 'browser') {
+            const actualAction = (finalAction === 'editor' || finalAction === 'browser') ? 'browser' : 'save';
+            if (actualAction === 'browser') {
                 shell.openExternal(url.pathToFileURL(filePath).toString());
-            } else if (finalAction === 'editor') {
-                shell.openPath(filePath);
-            }
+            } 
             return { success: true, filePath };
         } else if (format === 'docx') {
             const { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType } = require('docx');
@@ -1077,7 +1077,7 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             const buffer = await Packer.toBuffer(doc);
             fs.writeFileSync(filePath, buffer);
             if (finalAction === 'editor' || finalAction === 'browser') {
-                // Browser can also open docx in some OSes/setups or falls back to editor
+                // Ensure DOCX always opens in the editor, as browsers don't natively render them well
                 shell.openPath(filePath);
             }
             return { success: true, filePath };

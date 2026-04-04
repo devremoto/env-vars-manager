@@ -1255,16 +1255,56 @@ export class ModalManager {
 
             if (currentMode === 'appsettings') {
                 const fileName = env ? `appsettings.${env}.json` : 'appsettings.json';
-                text = `// File: ${fileName}\n{\n`;
+                text = `// File: ${fileName}\n`;
+                
+                // Build hierarchy and handle array conversion (matching main.ts logic)
+                const data: any = {};
                 sample.forEach(v => {
                     let name = v.name;
                     if (!includePrefix) {
                         const parts = name.split(/__|:/).filter((p: string) => !!p);
                         if (parts.length > 1) name = parts.slice(1).join('__');
                     }
-                    text += `  "${name}": "${isActiveMasking && v.isProtected ? maskString : escapeHtml(v.value)}",\n`;
+                    
+                    const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
+                    const pathParts = name.split(/__|:/).filter((p: string) => !!p);
+                    let curr = data;
+                    for (let i = 0; i < pathParts.length; i++) {
+                        const seg = pathParts[i];
+                        if (i === pathParts.length - 1) {
+                            curr[seg] = val;
+                        } else {
+                            if (!curr[seg] || typeof curr[seg] !== 'object') curr[seg] = {};
+                            curr = curr[seg];
+                        }
+                    }
                 });
-                text += (filteredVars.length > 3) ? '  ...\n}' : '}';
+
+                const convertToArray = (obj: any): any => {
+                    if (obj === null || typeof obj !== 'object') return obj;
+                    const keys = Object.keys(obj);
+                    const isAllNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                    if (isAllNumeric) {
+                        const sortedKeys = keys.map(Number).sort((a,b) => a-b);
+                        const minKey = sortedKeys[0];
+                        const arr: any[] = [];
+                        keys.forEach(k => {
+                            const index = parseInt(k, 10);
+                            const arrayIdx = minKey === 1 ? index - 1 : index;
+                            if (arrayIdx >= 0) arr[arrayIdx] = convertToArray(obj[k]);
+                        });
+                        return arr;
+                    }
+                    Object.keys(obj).forEach(k => { obj[k] = convertToArray(obj[k]); });
+                    return obj;
+                };
+
+                const finalData = convertToArray(data);
+                let jsonStr = JSON.stringify(finalData, null, 2);
+                if (filteredVars.length > 3) {
+                    jsonStr = jsonStr.replace(/\n\}$/, ',\n  "..." \n}');
+                }
+                text += jsonStr;
             } else {
                 sample.forEach(v => {
                     const val = (v.isProtected && isActiveMasking) ? maskString : v.value;

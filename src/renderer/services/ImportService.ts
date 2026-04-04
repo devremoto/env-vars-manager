@@ -12,6 +12,10 @@ export class ImportService {
     private btnImportCancel = $('import-modal-cancel');
     private btnImportClose = $('import-modal-close');
     private btnReveal = $('btn-import-reveal');
+    private btnImportInfo = $('btn-import-info');
+    private helpOverlay = $('import-help-overlay');
+    private btnHelpClose = $('import-help-close');
+    private btnHelpOk = $('import-help-ok');
     private isRevealed = false;
 
     constructor() {
@@ -34,6 +38,24 @@ export class ImportService {
             this.btnReveal.onclick = () => {
                 this.isRevealed = !this.isRevealed;
                 this.updateRevealUI();
+            };
+        }
+
+        if (this.btnImportInfo) {
+            this.btnImportInfo.onclick = () => {
+                if (this.helpOverlay) this.helpOverlay.classList.add('active');
+            };
+        }
+
+        if (this.btnHelpClose) {
+            this.btnHelpClose.onclick = () => {
+                if (this.helpOverlay) this.helpOverlay.classList.remove('active');
+            };
+        }
+
+        if (this.btnHelpOk) {
+            this.btnHelpOk.onclick = () => {
+                if (this.helpOverlay) this.helpOverlay.classList.remove('active');
             };
         }
     }
