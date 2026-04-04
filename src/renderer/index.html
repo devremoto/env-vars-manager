@@ -87,6 +87,8 @@
                 </div>
             </div>
             <div class="toolbar-right">
+                <button class="btn btn-secondary" id="btn-toggle-groups">↕️ Expand/Collapse All</button>
+                <button class="btn btn-secondary" id="btn-os-vars">⬆️ OS Variables</button>
                 <button class="btn btn-secondary" id="btn-refresh">🔄 Refresh</button>
                 <button class="btn btn-secondary" id="btn-history">🕒 History</button>
                 <button class="btn btn-secondary" id="btn-import">📥 Import</button>
@@ -116,9 +118,8 @@
             <button class="btn btn-secondary btn-sm" id="btn-ungroup" style="display: none;">🔗 Ungroup</button>
             <button class="btn btn-secondary btn-sm" id="btn-auto-protect">🛡️ Auto Protect</button>
             <button class="btn btn-secondary btn-sm" id="btn-clone-bulk" style="display: none;">👯 Clone Selected</button>
+            <button class="btn btn-danger btn-sm" id="btn-delete-bulk" style="display: none;">🗑️ Delete Selected <span id="delete-check-count"></span></button>
             <button class="btn btn-secondary btn-sm" id="btn-group" style="display: none;">🔗 Group Selected <span id="master-check-count"></span></button>
-            <button class="btn btn-secondary btn-sm" id="btn-toggle-groups">↕️ Expand/Collapse All</button>
-            <button class="btn btn-secondary btn-sm" id="btn-os-vars">⬆️ OS Variables</button>
             <div style="flex: 1"></div>
             <div id="admin-mode-container" style="display: none;">
                 <button class="btn btn-primary btn-sm" id="btn-admin-mode"><span id="admin-mode-text">Admin Mode</span></button>
@@ -491,6 +492,7 @@
         <div class="menu-item folder-action" id="menu-folder-open">📂 Open</div>
         <div class="menu-item folder-action" id="menu-folder-add">➕ Add Variable Here</div>
         <div class="menu-item folder-action" id="menu-folder-protect">🛡️ <span id="menu-folder-protect-text">Protect All Inside</span></div>
+        <div class="menu-item folder-action" id="menu-folder-rename">✏️ Rename Group...</div>
         <div class="menu-item folder-action" id="menu-folder-autoprotect">📦 Auto Protect Folder</div>
         <div class="menu-item folder-action" id="menu-folder-ungroup" style="display: none;">🔗 Ungroup Group</div>
         <div class="menu-sep"></div>

@@ -647,6 +647,36 @@ ipcMain.handle('delete-env-var', async (_event: any, name: string, isSystem: boo
     }
 });
 
+ipcMain.handle('delete-vars', async (_event: any, names: string[], isSystem: boolean = false): Promise<{ success: boolean; count: number; error?: string }> => {
+    const platform = os.platform();
+    let count = 0;
+    
+    try {
+        for (const name of names) {
+            if (platform === 'win32') {
+                try {
+                    const targetKey = isSystem ? 'HKLM\\System\\CurrentControlSet\\Control\\Session Manager\\Environment' : 'HKCU\\Environment';
+                    await execAsync(`reg delete "${targetKey}" /v "${name}" /f`);
+                } catch (regErr: any) {
+                    const msg = regErr.message.toLowerCase();
+                    const isNotFoundError = msg.includes('unable to find') || msg.includes('não foi possível');
+                    if (!isNotFoundError) console.error(`Error deleting ${name}:`, regErr.message);
+                }
+            } else {
+                const profilePath = getShellProfile();
+                removeFromShellProfile(profilePath, name);
+            }
+            
+            delete process.env[name];
+            await deleteVariable(name, isVarProtected(name));
+            count++;
+        }
+        return { success: true, count };
+    } catch (err: any) {
+        return { success: false, count, error: err.message };
+    }
+});
+
 // Optimization IPC
 ipcMain.handle('optimize-var', async (_event, name: string, explicitValue?: string) => {
     try {

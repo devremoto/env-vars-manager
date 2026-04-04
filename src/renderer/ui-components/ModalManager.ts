@@ -389,8 +389,9 @@ export class ModalManager {
 
     async openImportReviewModal(vars: EnvVar[], options: { 
         title?: string, 
-        mode?: 'import' | 'clone' | 'move' | 'copy-group',
-        defaultPrefix?: string 
+        mode?: 'import' | 'clone' | 'move' | 'copy-group' | 'rename-group',
+        defaultPrefix?: string,
+        stripPrefix?: string
     } = {}) {
         const titleEl = document.querySelector('#import-review-modal-overlay h2');
         if (titleEl) titleEl.textContent = options.title || 'Import Review';
@@ -459,7 +460,15 @@ export class ModalManager {
         const getFinalName = (origName: string) => {
             const doReplace = replaceSeparatorsCheck?.checked;
             const p = prefix ? `${prefix}${separator}` : '';
-            const baseName = doReplace ? splitVarName(origName).join(separator) : origName;
+            
+            let workingName = origName;
+            if (options.stripPrefix && workingName.startsWith(options.stripPrefix)) {
+                workingName = workingName.substring(options.stripPrefix.length);
+                if (workingName.startsWith('__')) workingName = workingName.substring(2);
+                else if (workingName.startsWith(':')) workingName = workingName.substring(1);
+            }
+
+            const baseName = doReplace ? splitVarName(workingName).join(separator) : workingName;
             return p + baseName;
         };
 
@@ -580,9 +589,7 @@ export class ModalManager {
                     // Filter out names that are same as target (no-op move)
                     const actualDelete = originalNamesToDelete.filter(old => !toImport.some(nt => nt.name === old));
                     if (actualDelete.length > 0) {
-                        for (const name of actualDelete) {
-                            await window.electronAPI.deleteEnvVar(name, false); 
-                        }
+                        await window.electronAPI.deleteVars(actualDelete, false);
                     }
                 }
 

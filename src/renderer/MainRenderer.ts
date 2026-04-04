@@ -120,6 +120,14 @@ export class MainRenderer {
                 this.modalManager.openImportReviewModal(vars, { title: 'Clone Selected Variables', mode: 'clone' });
             }
         };
+        $('btn-delete-bulk').onclick = () => {
+            const names = Array.from(state.selectedVars);
+            if (names.length > 0) (window as any).openDeleteConfirm(names);
+        };
+        $('btn-delete-bulk').onclick = () => {
+            const names = Array.from(state.selectedVars);
+            if (names.length > 0) (window as any).openDeleteConfirm(names);
+        };
         $('btn-group').onclick = () => this.modalManager.openGroupModal();
 
         // Keyboard Shortcuts
@@ -533,12 +541,19 @@ export class MainRenderer {
         const btnCloneBulk = $('btn-clone-bulk') as HTMLButtonElement;
         if (btnCloneBulk) {
             btnCloneBulk.style.display = hasVarSelection ? 'inline-flex' : 'none';
+            btnCloneBulk.innerHTML = `👯 Clone Selected (${state.selectedVars.size})`;
+        }
+
+        const btnDeleteBulk = $('btn-delete-bulk') as HTMLButtonElement;
+        if (btnDeleteBulk) {
+            btnDeleteBulk.style.display = hasVarSelection ? 'inline-flex' : 'none';
+            btnDeleteBulk.innerHTML = `🗑️ Delete Selected (${state.selectedVars.size})`;
         }
 
         const btnGroup = $('btn-group') as HTMLButtonElement;
-        btnGroup.style.display = hasVarSelection ? 'inline-flex' : 'none';
-        btnGroup.disabled = !canGroup;
-        if (hasVarSelection) {
+        if (btnGroup) {
+            btnGroup.style.display = hasVarSelection ? 'inline-flex' : 'none';
+            btnGroup.disabled = !canGroup;
             btnGroup.innerHTML = `🔗 Group Selected (${state.selectedVars.size})`;
         }
 
@@ -559,11 +574,6 @@ export class MainRenderer {
             });
 
             btnUngroup.style.display = (hasSelectedFolderGroup || hasSelectedVarGroup) ? 'inline-flex' : 'none';
-        }
-
-        let btnDelete = $('btn-delete-selected') as HTMLButtonElement;
-        if (btnDelete) {
-            btnDelete.style.display = (hasVarSelection || hasFolderSelection) ? 'inline-flex' : 'none';
         }
 
         const btnToggleGroups = $('btn-toggle-groups') as HTMLButtonElement;

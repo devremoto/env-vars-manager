@@ -30,6 +30,7 @@ export class ContextMenu {
         $('menu-folder-open').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-open'); };
         $('menu-folder-add').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-add'); };
         $('menu-folder-protect').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-protect'); };
+        $('menu-folder-rename').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-rename'); };
         $('menu-folder-autoprotect').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-autoprotect'); };
         $('menu-folder-ungroup').onclick = (e) => { e.stopPropagation(); this.handleAction('folder-ungroup'); };
     }
@@ -160,6 +161,9 @@ export class ContextMenu {
             case 'folder-autoprotect':
                 this.handleFolderAutoProtect(name);
                 break;
+            case 'folder-rename':
+                this.handleFolderRename(name);
+                break;
             case 'folder-ungroup':
                 import('../services/GroupingService.js').then(m => m.groupingService.ungroup(name));
                 break;
@@ -196,6 +200,25 @@ export class ContextMenu {
         if (varsToProtect.length > 0) {
             await window.electronAPI.protectVars(varsToProtect, true);
             await actionService.loadEnvVars();
+        }
+    }
+
+    private async handleFolderRename(folderName: string) {
+        const fullPath = [...state.explorerPath, folderName];
+        const oldPrefix = fullPath.join('__'); // This is what we strip
+        
+        const varsToRename = state.allEnvVars.filter(v => {
+            const parts = splitVarName(v.name);
+            return fullPath.every((p, i) => parts[i] === p);
+        });
+
+        if (varsToRename.length > 0) {
+            (window as any).modalManager.openImportReviewModal(varsToRename, { 
+                title: `Rename Group "${folderName}"`, 
+                mode: 'move', // Rename is effectively a Move with prefix awareness
+                defaultPrefix: folderName,
+                stripPrefix: oldPrefix
+            });
         }
     }
 }
