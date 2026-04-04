@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { $, escapeHtml, truncate, getVarId, MODAL_MASK, splitVarName, isPathLike, isUrlLike } from '../utils.js';
+import { $, escapeHtml, truncate, getVarId, MODAL_MASK, splitVarName, isPathLike, isUrlLike, isProtected, getMaskedValue } from '../utils.js';
 import { EnvVar } from '../types.js';
 import { actionService } from '../services/ActionService.js';
 import { groupingService } from '../services/GroupingService.js';
@@ -237,17 +237,14 @@ export class TableView {
     }
 
     private renderRow(v: EnvVar, isInsideGroup: boolean = false) {
-        const isProtected = state.protectedVars.has(v.name);
+        const isProtectedVar = isProtected(v.name);
         const isRevealed = state.revealedVars.has(v.name);
 
         const row = document.createElement('tr');
-        row.className = `var-row ${isInsideGroup ? 'row-child' : ''} ${state.selectedVars.has(v.name) ? 'selected' : ''} ${isProtected ? 'row-protected' : ''}`;
+        row.className = `var-row ${isInsideGroup ? 'row-child' : ''} ${state.selectedVars.has(v.name) ? 'selected' : ''} ${isProtectedVar ? 'row-protected' : ''}`;
         row.dataset.id = v.name;
         
-        let displayValue = v.value;
-        if (isProtected && !isRevealed) {
-            displayValue = MODAL_MASK;
-        }
+        const displayValue = getMaskedValue(v.name, v.value, isRevealed);
 
         row.innerHTML = `
             <td class="td-check">
@@ -261,7 +258,7 @@ export class TableView {
             </td>
             <td class="td-value">
                 <div class="value-cell" style="display: flex; align-items: center; gap: 4px;">
-                    ${isProtected ? `
+                    ${isProtectedVar ? `
                         <button class="btn-icon btn-reveal" data-id="${v.name}" title="${isRevealed ? 'Hide' : 'Show'} value">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -269,8 +266,8 @@ export class TableView {
                             </svg>
                         </button>
                     ` : ''}
-                    <code class="var-value ${isProtected && !isRevealed ? 'masked' : ''}" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        ${isProtected && !isRevealed ? escapeHtml(truncate(displayValue, 100)) : 
+                    <code class="var-value ${isProtectedVar && !isRevealed ? 'masked' : ''}" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${isProtectedVar && !isRevealed ? escapeHtml(truncate(displayValue, 100)) : 
                           (isUrlLike(v.value) ? `<a href="#" class="value-link link-url" data-url="${v.value}" title="Open URL in browser">${escapeHtml(truncate(v.value, 100))}</a>` : 
                            (isPathLike(v.value) ? `<a href="#" class="value-link link-path" data-path="${v.value}" title="${v.value.includes(';') ? 'Manage multiple paths' : (v.value.endsWith('.txt') || v.value.includes('.') ? 'Open file / Show in folder' : 'Open folder in explorer')}">${escapeHtml(truncate(v.value, 100))}</a>` : 
                             escapeHtml(truncate(displayValue, 100))))}
@@ -285,7 +282,7 @@ export class TableView {
             </td>
             <td class="td-protected">
                 <div style="display: flex; justify-content: center;">
-                    ${isProtected ? `
+                    ${isProtectedVar ? `
                         <span title="🛡 Protected — value is masked in exports and copies. Click the shield in Actions to unprotect." style="display:flex;cursor:default">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4CAF50" stroke-width="2">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>
@@ -301,8 +298,8 @@ export class TableView {
             <td class="td-actions">
                 <div class="row-actions" style="display: flex; gap: 4px; justify-content: center;">
                     <button class="btn-icon btn-copy-name" data-name="${v.name}" title="Copy name"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></button>
-                    <button class="btn-icon btn-toggle-protect ${isProtected ? 'protect-active' : ''}" data-id="${v.name}" title="${isProtected ? 'Unprotect' : 'Protect'}">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="${isProtected ? '#4CAF50' : 'currentColor'}" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>${isProtected ? '<path d="m9 12 2 2 4-4"/>' : ''}</svg>
+                    <button class="btn-icon btn-toggle-protect ${isProtectedVar ? 'protect-active' : ''}" data-id="${v.name}" title="${isProtectedVar ? 'Unprotect' : 'Protect'}">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="${isProtectedVar ? '#4CAF50' : 'currentColor'}" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>${isProtectedVar ? '<path d="m9 12 2 2 4-4"/>' : ''}</svg>
                     </button>
                     <button class="btn-icon btn-clone" data-id="${v.name}" title="Clone/Duplicate"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                     ${v.canOptimize ? `

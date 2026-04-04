@@ -4,6 +4,7 @@ import { actionService } from './services/ActionService.js';
 import { groupingService } from './services/GroupingService.js';
 import { clipboardService } from './services/ClipboardService.js';
 import { importService } from './services/ImportService.js';
+import { ExportDropdown } from './ui-components/ExportDropdown.js';
 import { TableView } from './ui-components/TableView.js';
 import { Explorer } from './ui-components/Explorer.js';
 import { ModalManager } from './ui-components/ModalManager.js';
@@ -242,56 +243,16 @@ export class MainRenderer {
             };
         }
 
-        // Export Dropdown
-        const btnExportDropdown = document.getElementById('btn-export-dropdown');
-        if (btnExportDropdown) {
-            btnExportDropdown.onclick = (e) => {
-                e.stopPropagation();
-                const menu = document.getElementById('export-dropdown-menu');
-                if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-            };
-        }
-
-        document.querySelectorAll('#export-dropdown-menu .dropdown-item').forEach(el => {
-            (el as HTMLElement).onclick = (e) => {
-                const format = el.getAttribute('data-format');
-                const isMasked = (document.getElementById('export-mask-checkbox') as HTMLInputElement)?.checked ?? false;
-                
-                if (format) {
-                    const varsToExport = this.getVarsToExport();
-
-                    if (format === 'script') {
-                        e.stopPropagation(); 
-                        this.modalManager.openScriptExportModal(varsToExport, isMasked);
-                    } else {
-                        window.electronAPI.exportEnvVars(varsToExport, format, isMasked);
-                    }
-
-                    const menu = document.getElementById('export-dropdown-menu');
-                    if (menu) menu.style.display = 'none';
+        // Export Dropdown Component
+        new ExportDropdown('export-dropdown-container', {
+            id: 'export-main',
+            onExport: (format: string, isMasked: boolean) => {
+                const varsToExport = this.getVarsToExport();
+                if (format === 'script') {
+                    this.modalManager.openScriptExportModal(varsToExport, isMasked);
+                } else {
+                    window.electronAPI.exportEnvVars(varsToExport, format, isMasked);
                 }
-            };
-        });
-
-        // Prevent dropdown closure when interacting with the mask checkbox or its container
-        const maskContainer = document.querySelector('#export-dropdown-menu > div:last-child');
-        if (maskContainer) {
-            maskContainer.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-        const maskCheckbox = document.getElementById('export-mask-checkbox');
-        if (maskCheckbox) {
-            maskCheckbox.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-
-        window.addEventListener('click', (e) => {
-            const exportMenu = document.getElementById('export-dropdown-menu');
-            const btnExport = document.getElementById('btn-export-dropdown');
-            if (exportMenu && !btnExport?.contains(e.target as Node) && !exportMenu.contains(e.target as Node)) {
-                exportMenu.style.display = 'none';
             }
         });
 

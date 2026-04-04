@@ -92,22 +92,7 @@
                 <button class="btn btn-secondary" id="btn-refresh">🔄 Refresh</button>
                 <button class="btn btn-secondary" id="btn-history">🕒 History</button>
                 <button class="btn btn-secondary" id="btn-import">📥 Import</button>
-                <div class="dropdown">
-                    <button class="btn btn-secondary" id="btn-export-dropdown">📤 Export ▾</button>
-                    <div class="dropdown-menu" id="export-dropdown-menu" style="display: none;">
-                        <div class="dropdown-item" data-format="txt">Text (.txt)</div>
-                        <div class="dropdown-item" data-format="json">JSON (.json)</div>
-                        <div class="dropdown-item" data-format="env">Env File (.env)</div>
-                        <div class="dropdown-item" data-format="csv">CSV (.csv)</div>
-                        <div class="menu-sep"></div>
-                        <div class="dropdown-item" data-format="html">HTML (.html)</div>
-                        <div class="dropdown-item" data-format="pdf">PDF (.pdf)</div>
-                        <div class="dropdown-item" data-format="docx">Word (.docx)</div>
-                        <div class="dropdown-item" data-format="script">Executable Script (.cmd/.sh)</div>
-                        <div class="menu-sep"></div>
-                        <div style="padding: 4px 12px; font-size: 11px;"><input type="checkbox" id="export-mask-checkbox" checked /> Mask Protected</div>
-                    </div>
-                </div>
+                <div id="export-dropdown-container"></div>
                 <button class="btn btn-primary" id="btn-add">➕ Add Variable</button>
             </div>
         </div>
@@ -294,9 +279,27 @@
 
     <div id="os-vars-overlay" class="modal-overlay">
         <div class="modal modal-lg">
-            <div class="modal-header"><h2>Windows Environment Variables</h2><button id="os-vars-close" class="close-btn">&times;</button></div>
-            <div class="modal-body" style="padding: 0;"><div id="os-vars-list"></div></div>
-            <div class="modal-footer"><button id="os-vars-cancel" class="btn btn-secondary">Close</button></div>
+            <div class="modal-header">
+                <h2>System Environment Variables</h2>
+                <div class="os-vars-toolbar" style="display: flex; gap: 8px; align-items: center; margin-left: auto; margin-right: 12px;">
+                    <div id="os-vars-export-dropdown-container"></div>
+                </div>
+                <button id="os-vars-close" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="os-vars-header" style="padding: 10px 20px; border-bottom: 1px solid var(--border-default); background: var(--bg-tertiary); display: flex; align-items: center; gap: 12px;">
+                    <input type="checkbox" id="os-vars-check-all" />
+                    <span style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Select All</span>
+                    <div style="flex: 1"></div>
+                    <div id="os-vars-selection-stats" style="font-size: 11px; color: var(--text-muted); display: none;">
+                        <span id="os-vars-selected-count">0</span> selected
+                    </div>
+                </div>
+                <div id="os-vars-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="os-vars-cancel" class="btn btn-secondary">Close</button>
+            </div>
         </div>
     </div>
 

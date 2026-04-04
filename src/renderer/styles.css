@@ -961,6 +961,8 @@ input[type="checkbox"]:indeterminate::before {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 320px;
+  min-height: 200px;
   transform: translateY(10px) scale(0.97);
   transition: transform var(--transition-normal);
 }
@@ -994,6 +996,8 @@ input[type="checkbox"]:indeterminate::before {
 .modal-body {
   padding: 0 24px 20px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {
@@ -1005,6 +1009,23 @@ input[type="checkbox"]:indeterminate::before {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-tertiary);
 }
+
+/* ─── Modal Resizing ────────────────────────────────────────────────────────── */
+.resizer {
+    position: absolute;
+    background: transparent;
+    z-index: 10;
+}
+
+.resizer-n { top: -4px; left: 4px; right: 4px; height: 8px; cursor: n-resize; }
+.resizer-e { top: 4px; bottom: 4px; right: -4px; width: 8px; cursor: e-resize; }
+.resizer-s { bottom: -4px; left: 4px; right: 4px; height: 8px; cursor: s-resize; }
+.resizer-w { top: 4px; bottom: 4px; left: -4px; width: 8px; cursor: w-resize; }
+
+.resizer-ne { top: -6px; right: -6px; width: 12px; height: 12px; cursor: ne-resize; }
+.resizer-se { bottom: -6px; right: -6px; width: 12px; height: 12px; cursor: se-resize; }
+.resizer-sw { bottom: -6px; left: -6px; width: 12px; height: 12px; cursor: sw-resize; }
+.resizer-nw { top: -6px; left: -6px; width: 12px; height: 12px; cursor: nw-resize; }
 
 /* ─── Forms ────────────────────────────────────────────────────────────────── */
 .form-group {

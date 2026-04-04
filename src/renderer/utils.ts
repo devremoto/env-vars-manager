@@ -34,6 +34,24 @@ export function isPathLike(value: string): boolean {
     return parts.some(p => !!p.trim().match(pathRegex));
 }
 
+export const MODAL_MASK = '********';
+
+/**
+ * Checks if a variable is protected (case-insensitive)
+ */
+export function isProtected(name: string): boolean {
+    if (!name) return false;
+    const nameUpper = name.toUpperCase();
+    return Array.from(state.protectedVars).some(v => v.toUpperCase() === nameUpper);
+}
+
+/**
+ * Returns masked value if protected and not revealed
+ */
+export function getMaskedValue(name: string, value: string, isRevealed: boolean = false): string {
+    return (isProtected(name) && !isRevealed) ? MODAL_MASK : value;
+}
+
 export function isUrlLike(value: string): boolean {
     if (!value) return false;
     const parts = value.split(/[; ]/).filter(p => !!p);
@@ -100,4 +118,3 @@ export function handleCopyFeedback(btn: HTMLButtonElement): void {
 }
 
 export const SENSITIVE_KEYWORDS = ['KEY', 'SECRET', 'PASS', 'TOKEN', 'AUTH', 'CLIENTID', 'CLIENT_ID', 'LICENCE', 'LICENSE'];
-export const MODAL_MASK = '********';

@@ -1,8 +1,9 @@
 import { state } from '../state.js';
-import { $, escapeHtml, truncate, getVarById, showToast, showLoading, isPathLike, handleCopyFeedback, splitVarName } from '../utils.js';
+import { $, escapeHtml, truncate, getVarById, showToast, showLoading, isPathLike, handleCopyFeedback, splitVarName, isProtected, getMaskedValue } from '../utils.js';
 import { EnvVar } from '../types.js';
 import { actionService } from '../services/ActionService.js';
 import { groupingService } from '../services/GroupingService.js';
+import { ExportDropdown } from './ExportDropdown.js';
 
 export class ModalManager {
     // Edit Modal elements
@@ -31,6 +32,8 @@ export class ModalManager {
     private historySortOrder: 'asc' | 'desc' = 'desc';
     private historySelectedIds = new Set<string>();
     private historyRevealedIds = new Set<string>();
+    private osVarsSelectedKeys = new Set<string>();
+    private osVarsData: Record<string, string> = {};
     private currentConfirmResolve: ((val: boolean) => void) | null = null;
 
     constructor() {
@@ -38,6 +41,9 @@ export class ModalManager {
     }
 
     private setupListeners() {
+        // Initialize draggables for all modals
+        this.initializeDraggables();
+
         $('modal-close').onclick = () => this.closeEditModal();
         $('modal-cancel').onclick = () => this.closeEditModal();
         $('modal-save').onclick = () => this.handleEditSave();
@@ -81,6 +87,31 @@ export class ModalManager {
                 else if ($('os-vars-overlay').classList.contains('active')) $('os-vars-overlay').classList.remove('active');
             }
         });
+
+        // OS Variables Export Dropdown Component
+        new ExportDropdown('os-vars-export-dropdown-container', {
+            id: 'export-os',
+            buttonClass: 'btn-secondary btn-sm',
+            includeMask: true,
+            onExport: (format: string, isMasked: boolean) => this.handleOsExport(format, isMasked)
+        });
+
+        const osCheckAll = $('os-vars-check-all') as HTMLInputElement;
+        if (osCheckAll) {
+            osCheckAll.onchange = () => {
+                const checks = document.querySelectorAll('.os-var-check') as NodeListOf<HTMLInputElement>;
+                checks.forEach(c => {
+                    c.checked = osCheckAll.checked;
+                    const key = c.dataset.key!;
+                    if (osCheckAll.checked) this.osVarsSelectedKeys.add(key);
+                    else this.osVarsSelectedKeys.delete(key);
+                });
+                this.updateOsVarsSelectionStats();
+            };
+        }
+
+        // Global exposing for dynamically rendered buttons
+        (window as any).modalManager = this;
     }
 
     openEditModal(v?: EnvVar) {
@@ -1000,6 +1031,13 @@ export class ModalManager {
         list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">Loading system variables...</div>';
         overlay.classList.add('active');
 
+        // Reset OS vars selection
+        this.osVarsSelectedKeys.clear();
+        this.osVarsData = {};
+        const checkAll = $('os-vars-check-all') as HTMLInputElement;
+        if (checkAll) checkAll.checked = false;
+        this.updateOsVarsSelectionStats();
+
         try {
             const categories = await window.electronAPI.getOsVars() as any as Record<string, Record<string, string>>;
             list.innerHTML = '';
@@ -1010,27 +1048,149 @@ export class ModalManager {
                 
                 if (sortedKeys.length > 0) {
                     const header = document.createElement('div');
-                    header.style.cssText = 'padding:14px 20px; background:var(--bg-tertiary); font-weight:700; font-size:11px; color:var(--accent-primary); text-transform:uppercase; letter-spacing:0.1em; border-bottom:1px solid var(--border-default);';
+                    header.style.cssText = 'padding:14px 20px; background:var(--bg-tertiary); font-weight:700; font-size:11px; border-bottom: 2px solid var(--border-default); color:var(--accent-primary); text-transform:uppercase; letter-spacing:0.1em;';
                     header.textContent = cat;
                     list.appendChild(header);
 
                     sortedKeys.forEach(key => {
+                        this.osVarsData[key] = vars[key];
+                        // Using shared robust case-insensitive helper
+                        const isProtectedVar = isProtected(key);
+                        
                         const item = document.createElement('div');
-                        item.style.cssText = 'padding:12px 20px; border-bottom:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:4px;';
+                        item.className = 'os-var-row';
+                        item.style.cssText = 'padding:12px 20px; border-bottom:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:6px; transition: 0.2s;';
+                        item.onmouseover = () => item.style.background = 'rgba(255,255,255,0.02)';
+                        item.onmouseout = () => item.style.background = 'transparent';
+                        
                         item.innerHTML = `
-                            <div style="font-weight:600; color:var(--accent-primary); font-size:12px;">${escapeHtml(key)}</div>
-                            <div style="font-family:var(--font-mono); font-size:11px; word-break:break-all; color:var(--text-primary); opacity:0.85;">${escapeHtml(vars[key])}</div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" class="os-var-check" data-key="${escapeHtml(key)}" style="margin-right: 4px;" />
+                                <div style="font-weight:700; color:var(--accent-primary-hover); font-size:13px; font-family: var(--font-mono);">${escapeHtml(key)}</div>
+                                <div style="margin-left: auto; display: flex; gap: 4px;">
+                                    <button class="btn btn-secondary btn-xs btn-protect ${isProtectedVar ? 'active' : ''}" onclick="window.modalManager.toggleOsProtection('${escapeHtml(key)}', this)" title="Toggle Protection">🛡️</button>
+                                    <button class="btn btn-secondary btn-xs" onclick="window.modalManager.copyOsValue('${escapeHtml(key)}', true)" title="Copy Key Only">Key</button>
+                                    <button class="btn btn-secondary btn-xs" onclick="window.modalManager.copyOsValue('${escapeHtml(key)}', false)" title="Copy Value Only">Value</button>
+                                    <button class="btn btn-secondary btn-xs" onclick="window.modalManager.copyOsKeyWrapped('${escapeHtml(key)}')" title="Copy Key with wrapping symbols">% Key % / $Key">Wrapped</button>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; padding-left: 28px;">
+                                ${isProtectedVar ? `
+                                    <button class="btn-icon btn-reveal-os" data-key="${escapeHtml(key)}" title="${state.revealedVars.has(key) ? 'Hide' : 'Show'} value" style="padding: 2px;">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </button>
+                                ` : ''}
+                                <div class="os-var-value" style="font-family:var(--font-mono); font-size:11px; word-break:break-all; color:var(--text-secondary); opacity:0.85;">
+                                    ${getMaskedValue(key, vars[key], state.revealedVars.has(key))}
+                                </div>
+                            </div>
                         `;
+
+                        const btnReveal = item.querySelector('.btn-reveal-os') as HTMLElement;
+                        if (btnReveal) {
+                            btnReveal.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const key = btnReveal.dataset.key!;
+                                const isNowRevealed = !state.revealedVars.has(key);
+                                
+                                if (isNowRevealed) state.revealedVars.add(key);
+                                else state.revealedVars.delete(key);
+                                
+                                // Update row UI instantly without re-rendering modal (avoiding blink)
+                                const valueDiv = item.querySelector('.os-var-value') as HTMLElement;
+                                if (valueDiv) {
+                                    valueDiv.textContent = getMaskedValue(key, vars[key], isNowRevealed);
+                                }
+                                
+                                // Update button title and icon
+                                btnReveal.title = isNowRevealed ? 'Hide value' : 'Show value';
+                                // SVG doesn't strictly need update for color, but could if needed. 
+                                // We'll just leave it and trust the masking update.
+                            });
+                        }
+
+                        const check = item.querySelector('.os-var-check') as HTMLInputElement;
+                        check.onchange = () => {
+                            if (check.checked) this.osVarsSelectedKeys.add(key);
+                            else this.osVarsSelectedKeys.delete(key);
+                            this.updateOsVarsSelectionStats();
+                        };
+
                         list.appendChild(item);
                     });
                 }
             });
 
             if (list.innerHTML === '') {
-                list.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-secondary);">No system variables found in Registry.</div>';
+                list.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-secondary);">No system variables found.</div>';
             }
         } catch (err: any) {
             list.innerHTML = `<div style="padding:40px; text-align:center; color:var(--error-color);">Failed to load Registry variables: ${err.message}</div>`;
+        }
+    }
+
+    private updateOsVarsSelectionStats() {
+        const stats = $('os-vars-selection-stats');
+        const count = $('os-vars-selected-count');
+        if (stats && count) {
+            stats.style.display = this.osVarsSelectedKeys.size > 0 ? 'inline-block' : 'none';
+            count.textContent = this.osVarsSelectedKeys.size.toString();
+        }
+    }
+
+    public copyOsValue(key: string, isKeyOnly: boolean = false) {
+        const val = this.osVarsData[key] || '';
+        const text = isKeyOnly ? key : val;
+        navigator.clipboard.writeText(text);
+        showToast(`${isKeyOnly ? 'Key' : 'Value'} copied to clipboard`);
+    }
+
+    public async copyOsKeyWrapped(key: string) {
+        const info = await window.electronAPI.getOsInfo();
+        const isWin = info.platform === 'win32';
+        const wrapped = isWin ? `%${key}%` : `$${key}`;
+        navigator.clipboard.writeText(wrapped);
+        showToast(`Wrapped key copied: ${wrapped}`);
+    }
+
+    public async toggleOsProtection(key: string, btn: HTMLElement) {
+        const success = await actionService.toggleProtection(key);
+        if (success) {
+            const isProtectedVar = isProtected(key);
+            btn.classList.toggle('active', isProtectedVar);
+            
+            // Also toggle value masking in the UI
+            const row = btn.closest('.os-var-row');
+            if (row) {
+                const valueDiv = row.querySelector('.os-var-value') as HTMLElement;
+                if (valueDiv) {
+                    const rawValue = this.osVarsData[key] || '';
+                    valueDiv.textContent = getMaskedValue(key, rawValue);
+                }
+            }
+        }
+    }
+
+    private async handleOsExport(format: string, isMasked: boolean) {
+        const selectedKeys = this.osVarsSelectedKeys.size > 0 ? Array.from(this.osVarsSelectedKeys) : Object.keys(this.osVarsData);
+        if (selectedKeys.length === 0) {
+            showToast('No OS variables to export', 'warning');
+            return;
+        }
+
+        const dataToExport = selectedKeys.map(k => ({
+            name: k,
+            value: this.osVarsData[k],
+            isProtected: state.protectedVars.has(k)
+        }));
+
+        if (format === 'script') {
+            this.openScriptExportModal(dataToExport, isMasked);
+        } else {
+            await window.electronAPI.exportEnvVars(dataToExport, format, isMasked);
         }
     }
 
@@ -1236,5 +1396,125 @@ export class ModalManager {
 
         updatePreview();
         overlay.classList.add('active');
+    }
+
+    private initializeDraggables() {
+        // Query headers to find headers
+        const headers = document.querySelectorAll('.modal-header');
+        headers.forEach((header: any) => {
+            const modal = header.closest('.modal') as HTMLElement;
+            if (modal) {
+                this.makeDraggable(modal, header as HTMLElement);
+                this.makeResizable(modal);
+            }
+        });
+    }
+
+    private makeDraggable(modal: HTMLElement, header: HTMLElement) {
+        header.style.cursor = 'move';
+        header.onmousedown = (e: MouseEvent) => {
+            // Don't drag if clicking buttons, inputs, etc.
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'A' || target.tagName === 'TEXTAREA') return;
+            if (target.closest('.modal-close') || target.closest('.close-btn') || target.closest('.btn-icon')) return;
+
+            e.preventDefault();
+            // get mouse cursor position at startup
+            let pos3 = e.clientX;
+            let pos4 = e.clientY;
+            
+            // To make dragging smooth and avoid centering issues, we switch to fixed positioning
+            const rect = modal.getBoundingClientRect();
+            modal.style.position = 'fixed';
+            modal.style.margin = '0';
+            modal.style.transform = 'none';
+            modal.style.top = rect.top + 'px';
+            modal.style.left = rect.left + 'px';
+
+            const elementDrag = (ev: MouseEvent) => {
+                ev.preventDefault();
+                // calculate the new cursor position
+                const pos1 = pos3 - ev.clientX;
+                const pos2 = pos4 - ev.clientY;
+                pos3 = ev.clientX;
+                pos4 = ev.clientY;
+                // set the element's new position
+                modal.style.top = (modal.offsetTop - pos2) + "px";
+                modal.style.left = (modal.offsetLeft - pos1) + "px";
+            };
+
+            const closeDragElement = () => {
+                document.removeEventListener('mouseup', closeDragElement);
+                document.removeEventListener('mousemove', elementDrag);
+            };
+
+            document.addEventListener('mouseup', closeDragElement);
+            document.addEventListener('mousemove', elementDrag);
+        };
+    }
+
+    private makeResizable(modal: HTMLElement) {
+        const directions = ['n', 'e', 's', 'w', 'ne', 'se', 'sw', 'nw'];
+        directions.forEach(dir => {
+            const resizer = document.createElement('div');
+            resizer.className = `resizer resizer-${dir}`;
+            modal.appendChild(resizer);
+            
+            resizer.onmousedown = (e: MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startWidth = modal.offsetWidth;
+                const startHeight = modal.offsetHeight;
+                
+                // Switch to fixed if not already (important for top/left changes)
+                const startRect = modal.getBoundingClientRect();
+                modal.style.position = 'fixed';
+                modal.style.top = startRect.top + 'px';
+                modal.style.left = startRect.left + 'px';
+                modal.style.margin = '0';
+                modal.style.transform = 'none';
+                
+                // Capture initial top/left after switching to fixed
+                const startTop = modal.offsetTop;
+                const startLeft = modal.offsetLeft;
+
+                const resize = (ev: MouseEvent) => {
+                    const diffX = ev.clientX - startX;
+                    const diffY = ev.clientY - startY;
+                    
+                    if (dir.includes('e')) {
+                        modal.style.width = Math.max(320, startWidth + diffX) + 'px';
+                    }
+                    if (dir.includes('s')) {
+                        modal.style.height = Math.max(200, startHeight + diffY) + 'px';
+                    }
+                    if (dir.includes('w')) {
+                        const newWidth = Math.max(320, startWidth - diffX);
+                        if (newWidth > 320 || diffX < 0) {
+                            modal.style.width = newWidth + 'px';
+                            modal.style.left = (startLeft + (startWidth - newWidth)) + 'px';
+                        }
+                    }
+                    if (dir.includes('n')) {
+                        const newHeight = Math.max(200, startHeight - diffY);
+                        if (newHeight > 200 || diffY < 0) {
+                            modal.style.height = newHeight + 'px';
+                            modal.style.top = (startTop + (startHeight - newHeight)) + 'px';
+                        }
+                    }
+                };
+                
+                const stopResize = () => {
+                   document.removeEventListener('mousemove', resize);
+                   document.removeEventListener('mouseup', stopResize);
+                };
+                
+                document.addEventListener('mousemove', resize);
+                document.addEventListener('mouseup', stopResize);
+            };
+        });
     }
 }

@@ -834,6 +834,9 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
         filePath = path.join(os.tmpdir(), `env-vars-export_${Date.now()}.${defaultExt}`);
     }
 
+    // Default actions if not provided
+    const finalAction = action || (['html', 'pdf'].includes(format) ? 'browser' : 'editor');
+
     try {
         // Filter out protected variables if requested
         const varsToProcess = excludeProtected ? vars.filter(v => !v.isProtected) : vars;
@@ -846,15 +849,15 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
 
         if (format === 'json') {
             const content = JSON.stringify(maskedVars, null, 2);
-            if (action === 'browser') {
+            if (finalAction === 'browser') {
                 openInBrowserWithLocalServer(content, 'application/json', 'export.json');
                 return { success: true };
             }
             fs.writeFileSync(filePath, content, 'utf-8');
-            if (action === 'editor') shell.openPath(filePath);
+            if (finalAction === 'editor') shell.openPath(filePath);
         } else if (format === 'csv') {
             const content = ['Name,Value,Group', ...maskedVars.map(v => `"${v.name.replace(/"/g, '""')}","${v.value.replace(/"/g, '""')}","${(v.groupName || '').replace(/"/g, '""')}"`)].join('\n');
-            if (action === 'browser') {
+            if (finalAction === 'browser') {
                 openInBrowserWithLocalServer(content, 'text/csv', 'export.csv');
                 return { success: true };
             }
@@ -865,12 +868,12 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
                 const line = `${v.name}=${v.value}`;
                 return (v.isProtected && isMasked) ? (format === 'env' ? `# ${line}` : line) : line;
             }).join('\n');
-            if (action === 'browser') {
+            if (finalAction === 'browser') {
                 openInBrowserWithLocalServer(content, 'text/plain', format === 'env' ? '.env' : 'export.txt');
                 return { success: true };
             }
             fs.writeFileSync(filePath, content, 'utf-8');
-            if (action === 'editor') shell.openPath(filePath);
+            if (finalAction === 'editor') shell.openPath(filePath);
         } else if (format === 'script') {
             const isWin = os.platform() === 'win32';
             const lines: string[] = [];
@@ -941,7 +944,7 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
 
                 const finalData = convertToArray(data);
                 const content = JSON.stringify(finalData, null, 2);
-                if (action === 'browser') {
+                if (finalAction === 'browser') {
                     const filename = envVal ? `appsettings.${envVal}.json` : 'appsettings.json';
                     openInBrowserWithLocalServer(content, 'application/json', filename);
                 } else {
@@ -995,12 +998,12 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             }
 
             const content = lines.join(os.EOL);
-            if (action === 'browser') {
+            if (finalAction === 'browser') {
                 const filename = mode === 'terraform' ? 'variables.tfvars' : (isWin ? 'export.bat' : 'export.sh');
                 openInBrowserWithLocalServer(content, 'text/plain', filename);
             } else {
                 fs.writeFileSync(filePath, content, 'utf-8');
-                shell.openPath(filePath);
+                if (finalAction === 'editor') shell.openPath(filePath);
             }
         } else if (format === 'html') {
             let htmlRows = '';
@@ -1016,11 +1019,11 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             }
             const htmlContent = `<!DOCTYPE html><html><head><style>body { font-family: sans-serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 8px; text-align: left; } .group-header { background: #eee; font-weight: bold; }</style></head><body><h2>Environment Variables</h2><table>${htmlRows}</table></body></html>`;
             
-            if (action === 'browser') {
+            if (finalAction === 'browser') {
                 openInBrowserWithLocalServer(htmlContent, 'text/html', 'variables.html');
             } else {
                 fs.writeFileSync(filePath, htmlContent, 'utf-8');
-                if (action === 'editor') shell.openPath(filePath);
+                if (finalAction === 'editor') shell.openPath(filePath);
             }
             return { success: true, filePath };
         } else if (format === 'pdf') {
@@ -1041,9 +1044,9 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             fs.writeFileSync(filePath, pdfData);
             win.close();
 
-            if (action === 'browser') {
+            if (finalAction === 'browser') {
                 shell.openExternal(url.pathToFileURL(filePath).toString());
-            } else if (action === 'editor') {
+            } else if (finalAction === 'editor') {
                 shell.openPath(filePath);
             }
             return { success: true, filePath };
@@ -1065,7 +1068,10 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
             });
             const buffer = await Packer.toBuffer(doc);
             fs.writeFileSync(filePath, buffer);
-            if (action === 'editor') shell.openPath(filePath);
+            if (finalAction === 'editor' || finalAction === 'browser') {
+                // Browser can also open docx in some OSes/setups or falls back to editor
+                shell.openPath(filePath);
+            }
             return { success: true, filePath };
         }
         return { success: true, filePath };
