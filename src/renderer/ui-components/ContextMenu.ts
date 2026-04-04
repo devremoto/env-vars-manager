@@ -18,6 +18,8 @@ export class ContextMenu {
         $('menu-edit').onclick = (e) => { e.stopPropagation(); this.handleAction('edit'); };
         $('menu-copy').onclick = (e) => { e.stopPropagation(); this.handleAction('copy'); };
         $('menu-clone').onclick = (e) => { e.stopPropagation(); this.handleAction('clone'); };
+        $('menu-copy-to-group').onclick = (e) => { e.stopPropagation(); this.handleAction('copy-group'); };
+        $('menu-move-to-group').onclick = (e) => { e.stopPropagation(); this.handleAction('move-group'); };
         $('menu-delete').onclick = (e) => { e.stopPropagation(); this.handleAction('delete'); };
         $('menu-protect').onclick = (e) => { e.stopPropagation(); this.handleAction('protect'); };
         $('menu-history').onclick = (e) => { e.stopPropagation(); this.handleAction('history'); };
@@ -37,8 +39,8 @@ export class ContextMenu {
         state.selectedExplorerVar = targetName;
         
         // Toggle menu items based on type
-        const varActions = document.querySelectorAll('.var-action');
-        const folderActions = document.querySelectorAll('.folder-action');
+        const varActions = document.querySelectorAll('.context-menu .var-action');
+        const folderActions = document.querySelectorAll('.context-menu .folder-action');
         
         varActions.forEach(el => (el as HTMLElement).style.display = isFolder ? 'none' : 'flex');
         folderActions.forEach(el => (el as HTMLElement).style.display = isFolder ? 'flex' : 'none');
@@ -47,6 +49,12 @@ export class ContextMenu {
             const v = getVarById(targetName);
             const isProtected = v ? state.protectedVars.has(v.name) : false;
             $('menu-protect-text').textContent = isProtected ? 'Unprotect' : 'Protect';
+            
+            // Context aware labels for selection
+            const cloneText = $('menu-clone');
+            if (cloneText) {
+                cloneText.textContent = state.selectedVars.size > 1 ? `👯 Clone Selected (${state.selectedVars.size})` : '👯 Clone Variable';
+            }
         } else {
             // Dynamically label protect action based on current protection state
             const protectTextEl = document.getElementById('menu-folder-protect-text');
@@ -72,7 +80,7 @@ export class ContextMenu {
         
         // Position menu
         const menuWidth = this.menu.offsetWidth || 180;
-        const menuHeight = this.menu.offsetHeight || 300;
+        const menuHeight = this.menu.offsetHeight || 380;
         
         let x = e.pageX;
         let y = e.pageY;
@@ -95,6 +103,13 @@ export class ContextMenu {
 
         this.hide();
         
+        const getVarsToProcess = () => {
+            const selected = Array.from(state.selectedVars).map(n => getVarById(n)).filter(v => !!v) as any[];
+            if (selected.length > 0 && Array.from(state.selectedVars).includes(name)) return selected;
+            const single = getVarById(name);
+            return single ? [single] : [];
+        };
+
         switch (action) {
             case 'view':
                 (window as any).openViewModal(getVarById(name));
@@ -107,10 +122,18 @@ export class ContextMenu {
                 if (v) navigator.clipboard.writeText(v.value);
                 break;
             case 'clone':
-                (window as any).openCloneModal(getVarById(name));
+            case 'copy-group':
+            case 'move-group':
+                const vars = getVarsToProcess();
+                if (vars.length > 0) {
+                    const title = action === 'clone' ? 'Clone Variables' : (action === 'move-group' ? 'Move to Group' : 'Copy to Group');
+                    const mode = action === 'clone' ? 'clone' : (action === 'move-group' ? 'move' : 'copy-group');
+                    (window as any).modalManager.openImportReviewModal(vars, { title, mode });
+                }
                 break;
             case 'delete':
-                (window as any).openDeleteConfirm([name]);
+                const toDel = getVarsToProcess().map(v => v.name);
+                if (toDel.length > 0) (window as any).openDeleteConfirm(toDel);
                 break;
             case 'protect':
                 actionService.toggleProtection(name);

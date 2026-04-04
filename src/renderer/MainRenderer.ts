@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { $, showToast, debugLog, splitVarName, handleCopyFeedback } from './utils.js';
+import { $, showToast, debugLog, splitVarName, handleCopyFeedback, getVarById } from './utils.js';
 import { actionService } from './services/ActionService.js';
 import { groupingService } from './services/GroupingService.js';
 import { clipboardService } from './services/ClipboardService.js';
@@ -114,6 +114,12 @@ export class MainRenderer {
         $('btn-add').onclick = () => this.modalManager.openEditModal();
         $('btn-auto-group').onclick = () => groupingService.handleAutoGroup();
         $('btn-ungroup').onclick = () => groupingService.ungroupSelected();
+        $('btn-clone-bulk').onclick = () => {
+            const vars = Array.from(state.selectedVars).map(n => getVarById(n)).filter(v => !!v) as any[];
+            if (vars.length > 0) {
+                this.modalManager.openImportReviewModal(vars, { title: 'Clone Selected Variables', mode: 'clone' });
+            }
+        };
         $('btn-group').onclick = () => this.modalManager.openGroupModal();
 
         // Keyboard Shortcuts
@@ -524,9 +530,17 @@ export class MainRenderer {
         const hasFolderSelection = state.selectedFolders.size > 0;
         const canGroup = state.selectedVars.size >= 2;
         
+        const btnCloneBulk = $('btn-clone-bulk') as HTMLButtonElement;
+        if (btnCloneBulk) {
+            btnCloneBulk.style.display = hasVarSelection ? 'inline-flex' : 'none';
+        }
+
         const btnGroup = $('btn-group') as HTMLButtonElement;
         btnGroup.style.display = hasVarSelection ? 'inline-flex' : 'none';
         btnGroup.disabled = !canGroup;
+        if (hasVarSelection) {
+            btnGroup.innerHTML = `🔗 Group Selected (${state.selectedVars.size})`;
+        }
 
         const btnUngroup = $('btn-ungroup') as HTMLButtonElement;
         if (btnUngroup) {

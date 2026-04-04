@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { $, escapeHtml, truncate, getVarById, showToast, showLoading, isPathLike, handleCopyFeedback } from '../utils.js';
+import { $, escapeHtml, truncate, getVarById, showToast, showLoading, isPathLike, handleCopyFeedback, splitVarName } from '../utils.js';
 import { EnvVar } from '../types.js';
 import { actionService } from '../services/ActionService.js';
 import { groupingService } from '../services/GroupingService.js';
@@ -387,7 +387,14 @@ export class ModalManager {
         }
     }
 
-    async openImportReviewModal(vars: EnvVar[]) {
+    async openImportReviewModal(vars: EnvVar[], options: { 
+        title?: string, 
+        mode?: 'import' | 'clone' | 'move' | 'copy-group',
+        defaultPrefix?: string 
+    } = {}) {
+        const titleEl = document.querySelector('#import-review-modal-overlay h2');
+        if (titleEl) titleEl.textContent = options.title || 'Import Review';
+
         const overlay = $('import-review-modal-overlay');
         const newList = $('import-review-new-list');
         const existingList = $('import-review-existing-list');
@@ -399,19 +406,38 @@ export class ModalManager {
         const btnReveal = $('btn-import-review-reveal');
         
         const prefixInput = $('import-prefix-input') as HTMLInputElement;
+        const separatorInput = $('import-separator-input') as HTMLInputElement;
+        const deleteOriginalsCheck = $('import-delete-originals') as HTMLInputElement;
+        const replaceSeparatorsCheck = $('import-replace-separators') as HTMLInputElement;
         const groupByPrefixCheck = $('import-group-by-prefix') as HTMLInputElement;
         const newSelectAll = $('import-new-select-all') as HTMLInputElement;
         const existingSelectAll = $('import-existing-select-all') as HTMLInputElement;
 
         let isRevealed = false;
-        let prefix = '';
+        let prefix = options.defaultPrefix || '';
+        let separator = separatorInput?.value || '__';
 
         if (prefixInput) {
-            prefixInput.value = '';
+            prefixInput.value = prefix;
             prefixInput.oninput = () => {
                 prefix = prefixInput.value.trim();
                 renderLists();
             };
+        }
+
+        if (separatorInput) {
+            separatorInput.oninput = () => {
+                separator = separatorInput.value;
+                renderLists();
+            };
+        }
+
+        if (deleteOriginalsCheck) {
+            deleteOriginalsCheck.checked = options.mode === 'move';
+        }
+
+        if (replaceSeparatorsCheck) {
+            replaceSeparatorsCheck.onclick = () => renderLists();
         }
         
         if (newSelectAll) {
@@ -430,14 +456,19 @@ export class ModalManager {
             };
         }
 
+        const getFinalName = (origName: string) => {
+            const doReplace = replaceSeparatorsCheck?.checked;
+            const p = prefix ? `${prefix}${separator}` : '';
+            const baseName = doReplace ? splitVarName(origName).join(separator) : origName;
+            return p + baseName;
+        };
+
         const renderLists = () => {
             newList.innerHTML = '';
             existingList.innerHTML = '';
             
-            const p = prefix ? `${prefix}__` : '';
-            
-            const newVars = vars.filter(v => !state.allEnvVars.some(ev => ev.name === (p + v.name)));
-            const existingVars = vars.filter(v => state.allEnvVars.some(ev => ev.name === (p + v.name)));
+            const newVars = vars.filter(v => !state.allEnvVars.some(ev => ev.name === getFinalName(v.name)));
+            const existingVars = vars.filter(v => state.allEnvVars.some(ev => ev.name === getFinalName(v.name)));
 
             newCountEl.textContent = newVars.length.toString();
             existingCountEl.textContent = existingVars.length.toString();
@@ -451,7 +482,7 @@ export class ModalManager {
                 item.style.alignItems = 'center';
                 item.style.gap = '8px';
                 
-                const finalName = p + v.name;
+                const finalName = getFinalName(v.name);
                 const displayVal = isRevealed ? escapeHtml(v.value) : '********';
                 const blurStyle = isRevealed ? '' : 'filter:blur(3px); opacity:0.5;';
 
@@ -475,7 +506,7 @@ export class ModalManager {
                 item.style.border = '1px solid rgba(255, 152, 0, 0.2)';
                 item.style.borderRadius = '4px';
                 
-                const finalName = p + v.name;
+                const finalName = getFinalName(v.name);
                 const displayVal = isRevealed ? escapeHtml(v.value) : '********';
                 const blurStyle = isRevealed ? '' : 'filter:blur(3px); opacity:0.5;';
                 
@@ -512,35 +543,58 @@ export class ModalManager {
         btnClose.onclick = close;
 
         btnConfirm.onclick = async () => {
-            const p = prefix ? `${prefix}__` : '';
+            const p = prefix ? `${prefix}${separator}` : '';
             const shouldGroup = groupByPrefixCheck?.checked && prefix;
+            const shouldDelete = deleteOriginalsCheck?.checked;
             
             const newChecks = newList.querySelectorAll('.import-new-check:checked');
             const overwriteChecks = existingList.querySelectorAll('.import-overwrite-check:checked');
             
             const toImport: EnvVar[] = [];
+            const originalNamesToDelete: string[] = [];
             
             newChecks.forEach(c => {
                 const origName = (c as HTMLInputElement).dataset.originalName;
                 const v = vars.find(x => x.name === origName);
-                if (v) toImport.push({ ...v, name: p + v.name });
+                if (v) {
+                    toImport.push({ ...v, name: getFinalName(origName!) });
+                    if (shouldDelete) originalNamesToDelete.push(origName!);
+                }
             });
             
             overwriteChecks.forEach(c => {
                 const origName = (c as HTMLInputElement).dataset.originalName;
                 const v = vars.find(x => x.name === origName);
-                if (v) toImport.push({ ...v, name: p + v.name });
+                if (v) {
+                    toImport.push({ ...v, name: getFinalName(origName!) });
+                    if (shouldDelete) originalNamesToDelete.push(origName!);
+                }
             });
 
             if (toImport.length > 0) {
                 const { importService } = await import('../services/ImportService.js');
                 await importService.processImport(toImport);
                 
-                if (shouldGroup) {
+                // If it's a move, delete original variables
+                if (shouldDelete && originalNamesToDelete.length > 0) {
+                    // Filter out names that are same as target (no-op move)
+                    const actualDelete = originalNamesToDelete.filter(old => !toImport.some(nt => nt.name === old));
+                    if (actualDelete.length > 0) {
+                        for (const name of actualDelete) {
+                            await window.electronAPI.deleteEnvVar(name, false); 
+                        }
+                    }
+                }
+
+                if (shouldGroup || options.mode === 'copy-group' || options.mode === 'move' || (shouldDelete && prefix)) {
+                    const groupName = prefix || 'Exported Group';
                     const names = toImport.map(v => v.name);
                     const { groupingService } = await import('../services/GroupingService.js');
-                    await groupingService.createGroupFromList(prefix, names);
+                    await groupingService.createGroupFromList(groupName, names);
                 }
+                
+                await actionService.loadEnvVars(true);
+                showToast(`${shouldDelete ? 'Moved' : (options.mode === 'clone' ? 'Cloned' : 'Imported')} ${toImport.length} variables successfully`);
             }
             close();
         };
