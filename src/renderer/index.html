@@ -438,7 +438,7 @@ PORT=3000</pre>
     </div>
     <!-- Script Export Modal -->
     <div id="script-export-overlay" class="modal-overlay">
-        <div class="modal" style="max-width: 900px;">
+        <div class="modal" style="max-width: 1000px; width: 95%;">
             <div class="modal-header">
                 <h2>Export as Script</h2>
                 <button id="script-export-close" class="modal-close">&times;</button>
@@ -478,6 +478,24 @@ PORT=3000</pre>
                         <div class="mode-desc">appsettings.{env}.json</div>
                     </div>
                 </div>
+                
+                <div id="os-selection-container" style="margin-top: 15px; display: grid; grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr); gap: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                    <div>
+                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Target OS</label>
+                        <select id="export-os-select" class="form-input" style="width: 100%; height: 36px; font-size: 13px; padding: 0 12px;">
+                            <option value="windows">🪟 Windows</option>
+                            <option value="linux">🐧 Linux / macOS</option>
+                        </select>
+                    </div>
+                    <div id="windows-cmd-container">
+                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Command Type</label>
+                        <select id="export-windows-cmd" class="form-input" style="width: 100%; height: 36px; font-size: 13px; padding: 0 12px;">
+                            <option value="set">set (Current Session)</option>
+                            <option value="setx">setx (Persistent)</option>
+                            <option value="powershell">PowerShell (Persistent)</option>
+                        </select>
+                    </div>
+                </div>
 
                 <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 6px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -513,7 +531,7 @@ PORT=3000</pre>
                 
                 <div style="margin-top: 20px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 11px; border: 1px solid var(--border-default);">
                     <strong>Preview:</strong>
-                    <pre id="script-export-preview" style="margin-top: 8px; color: var(--accent-primary); max-height: 80px; overflow-y: auto; font-family: var(--font-mono); font-size: 10px;"></pre>
+                    <pre id="script-export-preview" style="margin-top: 8px; color: var(--accent-primary); max-height: 150px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px;"></pre>
                 </div>
             </div>
             <div class="modal-footer">

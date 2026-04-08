@@ -1,0 +1,982 @@
+diff --git a/src/main.ts b/src/main.ts
+index 2d0e597..1f1f9b6 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -1,14 +1,10 @@
+-/* eslint-disable @typescript-eslint/no-var-requires */
+-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+-const path = require('path');
+-const os = require('os');
+-const fs = require('fs');
+-const url = require('url');
+-const http = require('http');
+-const { exec } = require('child_process');
+-const { promisify } = require('util');
+-const { initDB, upsertVariable, deleteVariable, getHistory, getHistoryById, getAllVariables, logHistory, getVariableByName } = require('./db');
+-const { optimizeValue } = require('./optimizer');
++import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
++import * as path from 'path';
++import * as os from 'os';
++import * as fs from 'fs';
++import { initDB } from './db';
++import { PathService } from './services/path-service';
++import { IpcManager } from './ipc-manager';
+ 
+ try {
+     require('electron-reloader')(module, {
+@@ -20,57 +16,6 @@ try {
+     console.error('electron-reloader error:', err);
+ }
+ 
+-const execAsync = promisify(exec);
+-
+-// Path to store protected variables data
+-let protectedVarsPath = '';
+-let environmentsPath = '';
+-let groupsPath = '';
+-
+-interface EnvVar {
+-    name: string;
+-    value: string;
+-    isSystem?: boolean;
+-    canOptimize?: boolean;
+-}
+-
+-function openInBrowserWithLocalServer(content: string, contentType: string, filename: string) {
+-    const server = http.createServer((_req: any, res: any) => {
+-        res.writeHead(200, { 
+-            'Content-Type': contentType,
+-            'Content-Disposition': `inline; filename="${filename}"`,
+-            'Access-Control-Allow-Origin': '*'
+-        });
+-        res.end(content);
+-        // We'll close later via timeout to ensure the browser has time to finish initial reads
+-    });
+-
+-    server.listen(0, '127.0.0.1', () => {
+-        const addr = server.address() as any;
+-        const port = addr?.port;
+-        if (port) {
+-            shell.openExternal(`http://127.0.0.1:${port}/${filename}`);
+-        }
+-    });
+-
+-    // Auto-shutdown after 30 seconds to clean up
+-    setTimeout(() => {
+-        try { server.close(); } catch (e) { /* ignore */ }
+-    }, 30000);
+-}
+-
+-interface OsInfo {
+-    type: string;
+-    platform: string;
+-    release: string;
+-    arch: string;
+-    hostname: string;
+-    homeDir: string;
+-    totalMem: string;
+-    cpus: number;
+-    uptime: string;
+-}
+-
+ let mainWindow: any = null;
+ 
+ function createWindow(): void {
+@@ -95,24 +40,13 @@ function createWindow(): void {
+     mainWindow.on('closed', () => {
+         mainWindow = null;
+     });
++
++    // Register all IPC handlers
++    IpcManager.register(mainWindow);
+ }
+ 
+-// Initialize file paths before app binds
+ app.on('ready', () => {
+-    protectedVarsPath = path.join(app.getPath('userData'), 'protected-vars.json');
+-    if (!fs.existsSync(protectedVarsPath)) {
+-        fs.writeFileSync(protectedVarsPath, JSON.stringify([]), 'utf-8');
+-    }
+-
+-    groupsPath = path.join(app.getPath('userData'), 'groups.json');
+-    if (!fs.existsSync(groupsPath)) {
+-        fs.writeFileSync(groupsPath, JSON.stringify({}), 'utf-8');
+-    }
+-
+-    environmentsPath = path.join(app.getPath('userData'), 'environments.json');
+-    if (!fs.existsSync(environmentsPath)) {
+-        fs.writeFileSync(environmentsPath, JSON.stringify(['Development', 'Staging', 'Production']), 'utf-8');
+-    }
++    PathService.initialize();
+ });
+ 
+ app.whenReady().then(async () => {
+@@ -132,481 +66,8 @@ app.on('activate', () => {
+     }
+ });
+ 
+-// ─── IPC Handlers ────────────────────────────────────────────────────────────
+-
+-// Window controls
+-ipcMain.handle('window-minimize', (event) => BrowserWindow.fromWebContents(event.sender)?.minimize());
+-ipcMain.handle('window-maximize', (event) => {
+-    const win = BrowserWindow.fromWebContents(event.sender);
+-    if (!win) return;
+-    if (win.isMaximized()) {
+-        win.unmaximize();
+-    } else {
+-        win.maximize();
+-    }
+-});
+-ipcMain.handle('window-close', (event) => BrowserWindow.fromWebContents(event.sender)?.close());
+-ipcMain.handle('open-url', (_event, url: string) => shell.openExternal(url));
+-
+-function expandEnvVars(pathStr: string): string {
+-    if (!pathStr) return pathStr;
+-    const platform = os.platform();
+-    if (platform === 'win32') {
+-        return pathStr.replace(/%([^%]+)%/g, (_, name) => {
+-            return process.env[name] || process.env[name.toUpperCase()] || `%${name}%`;
+-        });
+-    } else {
+-        let expanded = pathStr.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, name) => {
+-            return process.env[name] || `$${name}`;
+-        });
+-        expanded = expanded.replace(/\$\{([^}]+)\}/g, (_, name) => {
+-            return process.env[name] || `\${${name}}`;
+-        });
+-        return expanded;
+-    }
+-}
+-
+-ipcMain.handle('open-path', (_event, rawPath: string) => {
+-    const expanded = expandEnvVars(rawPath);
+-    return shell.openPath(expanded);
+-});
+-
+-ipcMain.handle('show-item-in-folder', (_event, rawPath: string) => {
+-    const expanded = expandEnvVars(rawPath);
+-    return shell.showItemInFolder(expanded);
+-});
+-
+-// Open CMD
+-ipcMain.handle('open-cmd', async (event, varName: string) => {
+-    try {
+-        const isWin = process.platform === 'win32';
+-        if (isWin) {
+-            // Spawn a new cmd window, show variable name literals (with % %) and its value clearly
+-            // Use /c so the window closes after timeout finishes
+-            const varSyntax = `%${varName}%`;
+-            require('child_process').spawn('cmd.exe', ['/c', 'start', 'cmd.exe', '/c', `echo Variable: ^%${varName}^% & echo Value: ${varSyntax} & timeout /t 10`], {
+-                detached: true,
+-                stdio: 'ignore'
+-            }).unref();
+-        } else {
+-            // macOS/Linux basic fallback
+-            // Remove 'exec bash' so the shell exits after sleep
+-            const varSyntax = `$${varName}`;
+-            require('child_process').spawn('sh', ['-c', `x-terminal-emulator -e "bash -c 'echo \"Variable: \\$${varName}\"; echo \"Value: ${varSyntax}\"; sleep 10'" || gnome-terminal -- bash -c "echo \"Variable: \\$${varName}\"; echo \"Value: ${varSyntax}\"; sleep 10" || xterm -e "bash -c 'echo \"Variable: \\$${varName}\"; echo \"Value: ${varSyntax}\"; sleep 10'"`], {
+-                detached: true,
+-                stdio: 'ignore'
+-            }).unref();
+-        }
+-        return { success: true };
+-    } catch (err: any) {
+-        return { success: false, error: err.message };
+-    }
+-});
+-
+-// OS Info
+-ipcMain.handle('check-is-admin', async (): Promise<boolean> => {
+-    if (os.platform() !== 'win32') {
+-        return process.getuid ? process.getuid() === 0 : false;
+-    }
+-    try {
+-        await execAsync('net session');
+-        return true;
+-    } catch {
+-        return false;
+-    }
+-});
+-
+-ipcMain.handle('get-os-info', (): OsInfo => {
+-    const totalMemGB = (os.totalmem() / (1024 ** 3)).toFixed(1);
+-    const uptimeHours = (os.uptime() / 3600).toFixed(1);
+-
+-    let osName = os.type();
+-    if (osName === 'Windows_NT') osName = 'Windows';
+-    else if (osName === 'Darwin') osName = 'macOS';
+-
+-    return {
+-        type: osName,
+-        platform: os.platform(),
+-        release: os.release(),
+-        arch: os.arch(),
+-        hostname: os.hostname(),
+-        homeDir: os.homedir(),
+-        totalMem: `${totalMemGB} GB`,
+-        cpus: os.cpus().length,
+-        uptime: `${uptimeHours} hours`,
+-    };
+-});
+-
+-ipcMain.handle('get-os-vars', async () => {
+-    try {
+-        const standardKeys = [
+-            'ALLUSERSPROFILE', 'APPDATA', 'COMPUTERNAME', 'COMSPEC', 'CommonProgramFiles',
+-            'CommonProgramFiles(x86)', 'CommonProgramW6432', 'DriverData', 'HOMEDRIVE',
+-            'HOMEPATH', 'LOCALAPPDATA', 'LOGONSERVER', 'NUMBER_OF_PROCESSORS', 'OS',
+-            'PATH', 'PATHEXT', 'PROCESSOR_ARCHITECTURE', 'PROCESSOR_IDENTIFIER',
+-            'PROCESSOR_LEVEL', 'PROCESSOR_REVISION', 'ProgramData', 'ProgramFiles',
+-            'ProgramFiles(x86)', 'ProgramW6432', 'PUBLIC', 'SESSIONNAME', 'SystemDrive',
+-            'SystemRoot', 'TEMP', 'TMP', 'USERDOMAIN', 'USERDOMAIN_ROAMINGPROFILE',
+-            'USERNAME', 'USERPROFILE', 'windir'
+-        ];
+-
+-        const standardVars: Record<string, string> = {};
+-        standardKeys.forEach(key => {
+-            const val = process.env[key] || process.env[key.toUpperCase()];
+-            if (val) standardVars[key] = val;
+-        });
+-
+-        // ONLY return the Standard ones. No noise.
+-        return {
+-            "Predefined OS Variables": standardVars
+-        };
+-    } catch (err) {
+-        console.error('Error fetching filtered OS variables:', err);
+-        return { "OS Variables": {} }; 
+-    }
+-});
+-
+-// Get environment variables
+-ipcMain.handle('get-env-vars', async (): Promise<EnvVar[]> => {
+-    try {
+-        console.log('Loading environment variables (IPC)...');
+-        
+-        // 1. Get current process snapshot as base
+-        const processVarsMap = new Map<string, string>();
+-        Object.entries(process.env).forEach(([k, v]) => {
+-            if (v !== undefined) processVarsMap.set(k, v);
+-        });
+-
+-        // 2. Fetch all variables from Database (The primary source of truth for managed vars)
+-        const dbVars = await getAllVariables();
+-        
+-        // Combine them into a definitive list
+-        const combined = new Map<string, EnvVar>();
+-        
+-        // Start with process vars (default to non-system as we don't know for sure here)
+-        processVarsMap.forEach((value, name) => {
+-            combined.set(name, { name, value, isSystem: false });
+-        });
+-
+-        // Override with DB vars (which have correct scope/value precision)
+-        dbVars.forEach((dv: any) => {
+-            combined.set(dv.name, { 
+-                name: dv.name, 
+-                value: dv.value, 
+-                isSystem: dv.scope === 'system' 
+-            });
+-        });
+-
+-        const list = Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name));
+-        const envContext = process.env as Record<string, string>;
+-
+-        // 3. Apply canOptimize flag (using the result from optimizer)
+-        return list.map(v => {
+-            try {
+-                const result = optimizeValue(v.name, v.value, envContext);
+-                return {
+-                    ...v,
+-                    canOptimize: result.lengthReduced > 0
+-                };
+-            } catch (e) {
+-                return { ...v, canOptimize: false };
+-            }
+-        });
+-    } catch (err: any) {
+-        console.error('CRITICAL: Error loading variables:', err);
+-        return [];
+-    }
+-});
+-
+-function parseRegistryOutputToEnvVars(output: string, isSystem: boolean): EnvVar[] {
+-    if (!output) return [];
+-    const vars: EnvVar[] = [];
+-    const lines = output.split(/\r?\n/).filter((line: string) => line.trim());
+-
+-    for (const line of lines) {
+-        // Match name, type, and value. Value can be empty.
+-        const match = line.match(/^\s+(\S+)\s+REG_(?:SZ|EXPAND_SZ)\s+(.*)$/);
+-        if (match) {
+-            vars.push({ name: match[1], value: match[2] || '', isSystem });
+-        }
+-    }
+-    return vars;
+-}
+-
+-function parseRegistryOutputToRecord(output: string): Record<string, string> {
+-    const vars: Record<string, string> = {};
+-    const lines = output.split(/\r?\n/).filter((line: string) => line.trim());
+-
+-    for (const line of lines) {
+-        const match = line.match(/^\s+(\S+)\s+REG_(?:SZ|EXPAND_SZ)\s+(.*)$/);
+-        if (match) {
+-            vars[match[1].toUpperCase()] = match[2];
+-        }
+-    }
+-    return vars;
+-}
+-
+-function parseRegistryOutput(output: string): EnvVar[] {
+-    const vars: EnvVar[] = [];
+-    const lines = output.split(/\r?\n/).filter((line: string) => line.trim());
+-
+-    for (const line of lines) {
+-        const match = line.match(/^\s+(\S+)\s+REG_(?:SZ|EXPAND_SZ)\s+(.*)$/);
+-        if (match) {
+-            vars.push({ name: match[1], value: match[2] });
+-        }
+-    }
+-
+-    return vars.sort((a: EnvVar, b: EnvVar) => a.name.localeCompare(b.name));
+-}
+-
+-function processEnvToArray(): EnvVar[] {
+-    return Object.entries(process.env)
+-        .filter(([, value]: [string, string | undefined]) => value !== undefined)
+-        .map(([name, value]: [string, string | undefined]) => ({ name, value: value as string, isSystem: false }))
+-        .sort((a: EnvVar, b: EnvVar) => a.name.localeCompare(b.name));
+-}
+-
+-const { spawn } = require('child_process');
+-
+-async function setRegistryValue(name: string, value: string, isSystem: boolean): Promise<void> {
+-    return new Promise((resolve, reject) => {
+-        const targetKey = isSystem ? 'HKLM\\System\\CurrentControlSet\\Control\\Session Manager\\Environment' : 'HKCU\\Environment';
+-        const type = value.includes('%') ? 'REG_EXPAND_SZ' : 'REG_SZ';
+-        
+-        // Use spawn to avoid shell expansion of %VAR% in the value itself
+-        const reg = spawn('reg', ['add', targetKey, '/v', name, '/t', type, '/d', value, '/f']);
+-        
+-        let errorData = '';
+-        reg.stderr.on('data', (data: any) => errorData += data.toString());
+-        
+-        reg.on('close', async (code: number) => {
+-            if (code === 0) {
+-                // Trigger refresh using the setx hack
+-                if (!isSystem) {
+-                    try {
+-                        await execAsync('setx __ENV_REFRESH__ "" && reg delete "HKCU\\Environment" /v __ENV_REFRESH__ /f 2>nul');
+-                    } catch (e) {}
+-                }
+-                resolve();
+-            } else {
+-                reject(new Error(`reg add failed with code ${code}: ${errorData}`));
+-            }
+-        });
+-    });
+-}
+-
+-// Create environment variable
+-ipcMain.handle('create-env-var', async (_event: any, name: string, value: string, isSystem: boolean = false, isProtected: boolean = false): Promise<{ success: boolean; error?: string }> => {
+-    const platform = os.platform();
+-
+-    try {
+-        if (platform === 'win32') {
+-            await setRegistryValue(name, value, isSystem);
+-        } else {
+-            const profilePath = getShellProfile();
+-            const exportLine = `export ${name}="${value}"`;
+-            fs.appendFileSync(profilePath, `\n${exportLine}\n`);
+-        }
+-
+-        // Immediately mutate the internal Node process environment
+-        process.env[name] = value;
+-        await upsertVariable(name, value, isSystem ? 'system' : 'user', isProtected);
+-
+-        // Handle initial protection state
+-        if (isProtected) {
+-            const list = getProtectedVarsList();
+-            if (!list.includes(name)) {
+-                list.push(name);
+-                fs.writeFileSync(protectedVarsPath, JSON.stringify(list, null, 2), 'utf-8');
+-            }
+-        }
+-
+-        return { success: true };
+-    } catch (err: any) {
+-        return { success: false, error: err.message || 'Error occurred. System variables may require Administrator privileges.' };
+-    }
+-});
+-
+-// Protected Variables Handlers
+-function getProtectedVarsList(): string[] {
+-    try {
+-        if (!fs.existsSync(protectedVarsPath)) return [];
+-        const content = fs.readFileSync(protectedVarsPath, 'utf-8');
+-        return JSON.parse(content);
+-    } catch {
+-        return [];
+-    }
+-}
+-
+-function isVarProtected(name: string): boolean {
+-    const list = getProtectedVarsList();
+-    return list.includes(name);
+-}
+-
+-ipcMain.handle('get-protected-vars', (): string[] => {
+-    return getProtectedVarsList();
+-});
+-
+-ipcMain.handle('toggle-protected-var', async (_event: any, name: string): Promise<{ success: boolean; isProtected: boolean; error?: string }> => {
+-    try {
+-        const list = getProtectedVarsList();
+-        const index = list.indexOf(name);
+-        let isProtected = false;
+-
+-        if (index >= 0) {
+-            list.splice(index, 1);
+-        } else {
+-            list.push(name);
+-            isProtected = true;
+-        }
+-
+-        fs.writeFileSync(protectedVarsPath, JSON.stringify(list, null, 2), 'utf-8');
+-
+-        // Log to history
+-        const existing = await getVariableByName(name);
+-        const val = existing ? existing.value : (process.env[name] || '');
+-        await logHistory(name, 'UPDATE', val, val, isProtected);
+-
+-        return { success: true, isProtected };
+-    } catch (err: any) {
+-        return { success: false, isProtected: false, error: err.message };
+-    }
+-});
+-
+-ipcMain.handle('protect-vars', async (_event: any, names: string[], protect: boolean): Promise<{ success: boolean; error?: string }> => {
+-    try {
+-        let list = getProtectedVarsList();
+-        const affectedNames: string[] = [];
+-
+-        if (protect) {
+-            names.forEach(name => {
+-                if (!list.includes(name)) {
+-                    list.push(name);
+-                    affectedNames.push(name);
+-                }
+-            });
+-        } else {
+-            names.forEach(name => {
+-                if (list.includes(name)) affectedNames.push(name);
+-            });
+-            list = list.filter(name => !names.includes(name));
+-        }
+-
+-        fs.writeFileSync(protectedVarsPath, JSON.stringify(list, null, 2), 'utf-8');
+-
+-        // Log to history for each affected variable
+-        for (const name of affectedNames) {
+-            const existing = await getVariableByName(name);
+-            const val = existing ? existing.value : (process.env[name] || '');
+-            await logHistory(name, 'UPDATE', val, val, protect);
+-        }
+-
+-        return { success: true };
+-    } catch (err: any) {
+-        return { success: false, error: err.message };
+-    }
+-});
+-
+-// Groups Handlers
+-ipcMain.handle('get-groups', (): Record<string, string[]> => {
+-    try {
+-        if (!fs.existsSync(groupsPath)) return {};
+-        const content = fs.readFileSync(groupsPath, 'utf-8');
+-        return JSON.parse(content);
+-    } catch {
+-        return {};
+-    }
+-});
+-
+-ipcMain.handle('save-groups', (_event: any, groups: Record<string, string[]>): { success: boolean; error?: string } => {
+-    try {
+-        fs.writeFileSync(groupsPath, JSON.stringify(groups, null, 2), 'utf-8');
+-        return { success: true };
+-    } catch (err: any) {
+-        return { success: false, error: err.message };
+-    }
+-});
+-
+-// Environments Handlers
+-ipcMain.handle('get-environments', (): string[] => {
+-    try {
+-        if (!fs.existsSync(environmentsPath)) return ['Development', 'Staging', 'Production'];
+-        const content = fs.readFileSync(environmentsPath, 'utf-8');
+-        return JSON.parse(content);
+-    } catch {
+-        return ['Development', 'Staging', 'Production'];
+-    }
+-});
+-
+-ipcMain.handle('save-environments', (_event: any, envs: string[]): { success: boolean; error?: string } => {
+-    try {
+-        fs.writeFileSync(environmentsPath, JSON.stringify(envs, null, 2), 'utf-8');
+-        return { success: true };
+-    } catch (err: any) {
+-        return { success: false, error: err.message };
+-    }
+-});
+-
+-// Update environment variable
+-ipcMain.handle('update-env-var', async (_event: any, name: string, value: string, oldName?: string, isSystem: boolean = false): Promise<{ success: boolean; error?: string }> => {
+-    const platform = os.platform();
+-
+-    try {
+-        if (platform === 'win32') {
+-            if (oldName && oldName !== name) {
+-                const targetKey = isSystem ? 'HKLM\\System\\CurrentControlSet\\Control\\Session Manager\\Environment' : 'HKCU\\Environment';
+-                await execAsync(`reg delete "${targetKey}" /v "${oldName}" /f`).catch(() => { });
+-                await deleteVariable(oldName, isVarProtected(oldName));
+-            }
+-            await setRegistryValue(name, value, isSystem);
+-        } else {
+-            const profilePath = getShellProfile();
+-            if (oldName && oldName !== name) {
+-                removeFromShellProfile(profilePath, oldName);
+-                await deleteVariable(oldName, isVarProtected(oldName));
+-            }
+-            updateShellProfile(profilePath, name, value);
+-        }
+-
+-        if (oldName && oldName !== name) {
+-            // Update protected vars list
+-            let protectedList = getProtectedVarsList();
+-            if (protectedList.includes(oldName)) {
+-                protectedList = protectedList.filter(n => n !== oldName);
+-                if (!protectedList.includes(name)) protectedList.push(name);
+-                fs.writeFileSync(protectedVarsPath, JSON.stringify(protectedList, null, 2), 'utf-8');
+-            }
+-
+-            // Update groups
+-            try {
+-                if (fs.existsSync(groupsPath)) {
+-                    const groupsData = JSON.parse(fs.readFileSync(groupsPath, 'utf-8'));
+-                    let groupsChanged = false;
+-                    Object.keys(groupsData).forEach(groupName => {
+-                        const vars = groupsData[groupName];
+-                        if (vars.includes(oldName)) {
+-                            groupsData[groupName] = vars.map((v: string) => v === oldName ? name : v);
+-                            groupsChanged = true;
+-                        }
+-                    });
+-                    if (groupsChanged) {
+-                        fs.writeFileSync(groupsPath, JSON.stringify(groupsData, null, 2), 'utf-8');
+-                    }
+-                }
+-            } catch (e) {
+-                console.error('Error updating groups during rename:', e);
+-            }
+-        }
+-
+-        // Immediately mutate the internal Node process environment
+-        process.env[name] = value;
+-        if (oldName && oldName !== name) delete process.env[oldName];
+-        await upsertVariable(name, value, isSystem ? 'system' : 'user', isVarProtected(name));
+-
+-        return { success: true };
+-    } catch (err: any) {
+-        return { success: false, error: err.message || 'Error occurred. System variables may require Administrator privileges.' };
++// ─── IPC Handlers ───────────────────�// ... handlers moved to IpcManager ...
++ success: false, error: err.message || 'Error occurred. System variables may require Administrator privileges.' };
+     }
+ });
+ 
+@@ -795,7 +256,7 @@ ipcMain.handle('reset-app', async (): Promise<{ success: boolean; error?: string
+ });
+ 
+ // Export env vars
+-ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = '', action: string = 'save', excludeProtected: boolean = false, maskBlank: boolean = false): Promise<{ success: boolean; filePath?: string; error?: string }> => {
++ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, value: string, isProtected?: boolean, groupName?: string }[], format: string, isMasked: boolean, mode: string = 'standard', extraParam: string = '', action?: string, excludeProtected: boolean = false, maskBlank: boolean = false): Promise<{ success: boolean; filePath?: string; error?: string }> => {
+     if (!mainWindow) return { success: false, error: 'No window' };
+ 
+     // Use formatting logic established above (extension calculation etc) ...
+@@ -807,6 +268,15 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+     if (format === 'script') {
+         const isWin = os.platform() === 'win32';
+         defaultExt = isWin ? 'cmd' : 'sh';
++
++        // Check for powershell in extraParam if version of mode supports it
++        if ((mode === 'standard' || mode === 'aws' || mode === 'azure' || mode === 'terraform') && extraParam) {
++            const [targetOs, winCmd] = extraParam.split('|');
++            if (targetOs === 'windows' && winCmd === 'powershell') {
++                defaultExt = 'ps1';
++            }
++        }
++
+         if (mode === 'terraform') defaultExt = 'tfvars';
+         if (mode === 'appsettings') {
+             defaultExt = 'json';
+@@ -863,6 +333,7 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+             }
+             fs.writeFileSync(filePath, content, 'utf-8');
+             if (finalAction === 'editor') shell.openPath(filePath);
++            return { success: true, filePath };
+         } else if (format === 'csv') {
+             const content = ['Name,Value,Group', ...maskedVars.map(v => `"${v.name.replace(/"/g, '""')}","${v.value.replace(/"/g, '""')}","${(v.groupName || '').replace(/"/g, '""')}"`)].join('\n');
+             if (finalAction === 'browser') {
+@@ -870,11 +341,12 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+                 return { success: true };
+             }
+             fs.writeFileSync(filePath, content, 'utf-8');
+-            if (action === 'editor') shell.openPath(filePath);
++            if (finalAction === 'editor') shell.openPath(filePath);
++            return { success: true, filePath };
+         } else if (format === 'txt' || format === 'env') {
+             const content = maskedVars.map(v => {
+                 const line = `${v.name}=${v.value}`;
+-                return (v.isProtected && isMasked) ? (format === 'env' ? `# ${line}` : line) : line;
++                return (v.isProtected && (isMasked || maskBlank)) ? (format === 'env' ? `# ${line}` : line) : line;
+             }).join('\n');
+             if (finalAction === 'browser') {
+                 openInBrowserWithLocalServer(content, 'text/plain', format === 'env' ? '.env' : 'export.txt');
+@@ -882,8 +354,12 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+             }
+             fs.writeFileSync(filePath, content, 'utf-8');
+             if (finalAction === 'editor') shell.openPath(filePath);
++            return { success: true, filePath };
+         } else if (format === 'script') {
+-            const isWin = os.platform() === 'win32';
++            let [targetOs, winCmd] = (mode === 'standard' || mode === 'aws' || mode === 'azure' || mode === 'terraform') ? (extraParam || '|').split('|') : [os.platform() === 'win32' ? 'windows' : 'linux', 'set'];
++            targetOs = targetOs || (os.platform() === 'win32' ? 'windows' : 'linux');
++            winCmd = winCmd || 'set';
++            const isWin = targetOs === 'windows';
+             const lines: string[] = [];
+             
+             if (isWin && mode === 'standard') lines.push('@echo off');
+@@ -962,6 +438,10 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+                 return { success: true };
+             }
+ 
++            if (!isWin && mode === 'standard') {
++                lines.push('cat <<EOF >> ~/.bashrc');
++            }
++
+             maskedVars.forEach(v => {
+                 const name = v.name;
+                 const val = v.value;
+@@ -969,7 +449,13 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+ 
+                 if (mode === 'standard') {
+                     if (isWin) {
+-                        line = `set "${name}=${val}"`;
++                        if (winCmd === 'setx') {
++                            line = `setx ${name} "${val}"`;
++                        } else if (winCmd === 'powershell') {
++                            line = `[Environment]::SetEnvironmentVariable("${name}", "${val}", "User")`;
++                        } else {
++                            line = `set "${name}=${val}"`;
++                        }
+                     } else {
+                         line = `export ${name}="${val}"`;
+                     }
+@@ -984,7 +470,7 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+                      line = `gh secret set ${name} -b"${val}"${repoFlag}`;
+                 }
+ 
+-                if (v.isProtected && isMasked) {
++                if (v.isProtected && (isMasked || maskBlank)) {
+                     if (isWin && mode === 'standard') {
+                          lines.push(`REM ${line}`);
+                     } else {
+@@ -995,44 +481,134 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+                 }
+             });
+ 
+-            // Add pause at the end (unless it's a .tfvars file)
+-            if (mode !== 'terraform') {
++            if (!isWin && mode === 'standard') {
++                lines.push('EOF');
++                lines.push('');
++                lines.push('source ~/.bashrc');
++            }
++
++            // Add pause at the end (unless it's a .tfvars file or standard linux export)
++            if (mode !== 'terraform' && (isWin || (mode !== 'standard'))) {
+                 lines.push('');
+                 if (isWin) {
+-                    lines.push('pause');
++                    if (winCmd === 'powershell') {
++                        lines.push('Read-Host "Press any key to continue..."');
++                    } else {
++                        lines.push('pause');
++                    }
+                 } else {
+                     lines.push('read -p "Press any key to continue..."');
+                 }
+             }
+ 
+-            const content = lines.join(os.EOL);
++            const content = lines.join('\n');
+             if (finalAction === 'browser') {
+-                const filename = mode === 'terraform' ? 'variables.tfvars' : (isWin ? 'export.bat' : 'export.sh');
++                let filename = isWin ? 'export.bat' : 'export.sh';
++                if (mode === 'terraform') filename = 'variables.tfvars';
++                if (isWin && winCmd === 'powershell') filename = 'export.ps1';
+                 openInBrowserWithLocalServer(content, 'text/plain', filename);
++                return { success: true };
+             } else {
+                 fs.writeFileSync(filePath, content, 'utf-8');
+                 if (finalAction === 'editor') shell.openPath(filePath);
+             }
++            return { success: true, filePath };
+         } else if (format === 'html') {
+             let htmlRows = '';
+             let currentGroup: string | undefined | null = null;
+             for (const v of maskedVars) {
+                 if (v.groupName !== currentGroup) {
+                     currentGroup = v.groupName;
+-                    const groupTitle = currentGroup || 'Ungrouped Variables';
++                    const groupTitle = (currentGroup || 'Ungrouped Variables').toUpperCase();
+                     htmlRows += `<tr class="group-header"><td colspan="2">${groupTitle}</td></tr>`;
+-                    htmlRows += `<tr class="col-headers"><th>Name</th><th>Value</th></tr>`;
++                    htmlRows += `<tr class="col-headers"><th>NAME</th><th>VALUE</th></tr>`;
+                 }
+-                htmlRows += `<tr><td>${v.name}</td><td>${v.value}</td></tr>`;
++                htmlRows += `<tr><td class="var-name">${v.name}</td><td class="var-value">${v.value}</td></tr>`;
+             }
+-            const htmlContent = `<!DOCTYPE html><html><head><style>body { font-family: sans-serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 8px; text-align: left; } .group-header { background: #eee; font-weight: bold; }</style></head><body><h2>Environment Variables</h2><table>${htmlRows}</table></body></html>`;
++            const htmlContent = `
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <title>Environment Variables Export</title>
++    <style>
++        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap');
++        :root {
++            --primary: #7c6aff;
++            --primary-dark: #5b4bdb;
++            --bg: #f8fafc;
++            --card: #ffffff;
++            --text: #1e293b;
++            --text-muted: #64748b;
++            --border: #e2e8f0;
++        }
++        body { 
++            font-family: 'Inter', sans-serif; 
++            background: var(--bg); 
++            color: var(--text); 
++            padding: 40px; 
++            margin: 0;
++            line-height: 1.5;
++        }
++        .header { margin-bottom: 32px; }
++        h1 { font-size: 28px; font-weight: 700; color: var(--primary); margin: 0; }
++        .timestamp { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
++        
++        .table-card {
++            background: var(--card);
++            border-radius: 16px;
++            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
++            border: 1px solid var(--border);
++            overflow: hidden;
++        }
++        table { width: 100%; border-collapse: collapse; margin: 0; }
++        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--border); }
++        
++        .group-header {
++            background: #f1f5f9;
++            font-weight: 700;
++            color: var(--primary-dark);
++            font-size: 13px;
++        }
++        
++        .col-headers th {
++            background: #f8fafc;
++            color: var(--text-muted);
++            font-size: 10px;
++            border-bottom: 2px solid var(--border);
++        }
++        
++        .var-name {
++            font-family: 'JetBrains Mono', monospace;
++            font-size: 13px;
++            color: var(--primary-dark);
++            font-weight: 600;
++        }
++        .var-value {
++            font-family: 'JetBrains Mono', monospace;
++            font-size: 12px;
++            color: var(--text-muted);
++            word-break: break-all;
++        }
++        tr:last-child td { border-bottom: none; }
++        tr:hover td { background: #fbfcfe; }
++    </style>
++</head>
++<body>
++    <div class="header">
++        <h1>Environment Variables</h1>
++        <div class="timestamp">Exported on ${new Date().toLocaleString()}</div>
++    </div>
++    <div class="table-card">
++        <table>${htmlRows}</table>
++    </div>
++</body>
++</html>`;
+             
+-            // We always write the file if it's meant to be opened or saved
+             fs.writeFileSync(filePath, htmlContent, 'utf-8');
+-
+-            const actualAction = (finalAction === 'editor' || finalAction === 'browser') ? 'browser' : 'save';
+-            if (actualAction === 'browser') {
++            if (action === 'editor' || action === 'browser') {
+                 shell.openExternal(url.pathToFileURL(filePath).toString());
++                return { success: true, filePath };
+             }
+             return { success: true, filePath };
+         } else if (format === 'pdf') {
+@@ -1041,12 +617,25 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+             for (const v of maskedVars) {
+                 if (v.groupName !== currentGroup) {
+                     currentGroup = v.groupName;
+-                    const groupTitle = currentGroup || 'Ungrouped Variables';
++                    const groupTitle = (currentGroup || 'Ungrouped Variables').toUpperCase();
+                     htmlRows += `<tr class="group-header"><td colspan="2">${groupTitle}</td></tr>`;
++                    htmlRows += `<tr class="col-headers"><th>NAME</th><th>VALUE</th></tr>`;
+                 }
+-                htmlRows += `<tr><td>${v.name}</td><td>${v.value}</td></tr>`;
++                htmlRows += `<tr><td class="var-name">${v.name}</td><td class="var-value">${v.value}</td></tr>`;
+             }
+-            const htmlContent = `<html><head><style>body { font-family: sans-serif; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 5px; }</style></head><body><h2>Variables</h2><table>${htmlRows}</table></body></html>`;
++            const htmlContent = `<html><head><style>
++                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap');
++                body { font-family: 'Inter', sans-serif; color: #1e293b; padding: 20px; }
++                .header { margin-bottom: 24px; }
++                h1 { color: #7c6aff; font-size: 24px; }
++                table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; }
++                th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
++                .group-header { background: #f1f5f9; font-weight: bold; color: #5b4bdb; }
++                .col-headers th { background: #f8fafc; color: #64748b; font-size: 10px; }
++                .var-name { font-family: 'JetBrains Mono', monospace; font-weight: bold; color: #5b4bdb; }
++                .var-value { font-family: 'JetBrains Mono', monospace; color: #64748b; }
++            </style></head><body><div class="header"><h1>Environment Variables</h1></div><table>${htmlRows}</table></body></html>`;
++            
+             const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false, contextIsolation: true } });
+             await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+             const pdfData = await win.webContents.printToPDF({ printBackground: true, landscape: true });
+@@ -1059,25 +648,100 @@ ipcMain.handle('export-env-vars', async (_event: any, vars: { name: string, valu
+             } 
+             return { success: true, filePath };
+         } else if (format === 'docx') {
+-            const { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType } = require('docx');
+-            const tableRows = maskedVars.map(v => new TableRow({
+-                children: [
+-                    new TableCell({ children: [new Paragraph(v.name)] }),
+-                    new TableCell({ children: [new Paragraph(v.value)] })
+-                ]
+-            }));
++            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } = require('docx');
++            const tableRows: any[] = [];
++            let currentGroup: string | null = null;
++            
++            // Re-usable border style
++            const standardBorder = { color: "e2e8f0", size: 1, style: BorderStyle.SINGLE };
++            const noBorder = { style: BorderStyle.NIL };
++
++            maskedVars.forEach(v => {
++                if (v.groupName !== currentGroup) {
++                    currentGroup = v.groupName;
++                    // Group Header Row
++                    tableRows.push(new TableRow({
++                        children: [
++                            new TableCell({
++                                children: [new Paragraph({ 
++                                    children: [new TextRun({ text: (currentGroup || 'General Variables').toUpperCase(), bold: true, size: 20 })],
++                                    spacing: { before: 200, after: 100 }
++                                })],
++                                columnSpan: 2,
++                                shading: { fill: "f1f5f9" },
++                                borders: { top: standardBorder, bottom: standardBorder, left: noBorder, right: noBorder },
++                                margins: { left: 200, right: 200 }
++                            })
++                        ]
++                    }));
++                    // Column Labels Row
++                    tableRows.push(new TableRow({
++                        children: [
++                            new TableCell({ 
++                                children: [new Paragraph({ 
++                                    children: [new TextRun({ text: "VARIABLE NAME", bold: true, size: 16, color: "64748b" })]
++                                })],
++                                shading: { fill: "f8fafc" },
++                                width: { size: 40, type: WidthType.PERCENTAGE },
++                                borders: { bottom: standardBorder, left: noBorder, right: noBorder },
++                                margins: { top: 100, bottom: 100, left: 200 }
++                            }),
++                            new TableCell({ 
++                                children: [new Paragraph({ 
++                                    children: [new TextRun({ text: "CURRENT VALUE", bold: true, size: 16, color: "64748b" })]
++                                })],
++                                shading: { fill: "f8fafc" },
++                                width: { size: 60, type: WidthType.PERCENTAGE },
++                                borders: { bottom: standardBorder, left: noBorder, right: noBorder },
++                                margins: { top: 100, bottom: 100, left: 200 }
++                            })
++                        ]
++                    }));
++                }
++
++                // Variable Row
++                tableRows.push(new TableRow({
++                    children: [
++                        new TableCell({ 
++                            children: [new Paragraph({ 
++                                children: [new TextRun({ text: v.name, color: "7c6aff", bold: true, size: 18, font: "Segoe UI" })]
++                            })],
++                            borders: { bottom: standardBorder, left: noBorder, right: noBorder },
++                            margins: { top: 100, bottom: 100, left: 200 }
++                        }),
++                        new TableCell({ 
++                            children: [new Paragraph({ 
++                                children: [new TextRun({ text: v.value, color: "475569", size: 18, font: "Consolas" })]
++                            })],
++                            borders: { bottom: standardBorder, left: noBorder, right: noBorder },
++                            margins: { top: 100, bottom: 100, left: 200 }
++                        })
++                    ]
++                }));
++            });
++
+             const doc = new Document({
+                 sections: [{
+                     children: [
+-                        new Paragraph({ text: "Environment Variables", heading: "Heading1" }),
+-                        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows })
++                        new Paragraph({ 
++                            children: [new TextRun({ text: "Environment Variables", color: "7c6aff", size: 48, bold: true })],
++                            spacing: { after: 200 }
++                        }),
++                        new Paragraph({ 
++                            children: [new TextRun({ text: `Exported on ${new Date().toLocaleString()}`, color: "64748b", size: 18 })],
++                            spacing: { after: 400 }
++                        }),
++                        new Table({ 
++                            width: { size: 100, type: WidthType.PERCENTAGE }, 
++                            rows: tableRows,
++                            borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder }
++                        })
+                     ]
+                 }]
+             });
+             const buffer = await Packer.toBuffer(doc);
+             fs.writeFileSync(filePath, buffer);
+             if (finalAction === 'editor' || finalAction === 'browser') {
+-                // Ensure DOCX always opens in the editor, as browsers don't natively render them well
+                 shell.openPath(filePath);
+             }
+             return { success: true, filePath };

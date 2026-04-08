@@ -1213,6 +1213,17 @@ export class ModalManager {
         const activeBtn = overlay.querySelector('.export-mode-btn.active') as HTMLElement;
         let currentMode = activeBtn?.dataset.mode || 'standard';
 
+        const osSelect = $('export-os-select') as HTMLSelectElement;
+        const winCmdSelect = $('export-windows-cmd') as HTMLSelectElement;
+        const winCmdContainer = $('windows-cmd-container');
+
+        // Initialize OS selection based on current platform
+        const isWinPlatform = navigator.userAgent.toLowerCase().includes('win');
+        if (osSelect) {
+            osSelect.value = isWinPlatform ? 'windows' : 'linux';
+            if (winCmdContainer) winCmdContainer.style.display = isWinPlatform ? 'block' : 'none';
+        }
+
         const updatePreview = async () => {
             const currentMaskedMaster = maskCheckbox?.checked ?? isMasked;
             const currentExclude = excludeCheckbox?.checked ?? false;
@@ -1225,11 +1236,16 @@ export class ModalManager {
             const maskString = currentBlank ? '' : '********';
             const isActiveMasking = currentMaskedMaster && !currentExclude;
             
-            const isWin = navigator.userAgent.toLowerCase().includes('win');
+            const targetOs = osSelect?.value || (navigator.userAgent.toLowerCase().includes('win') ? 'windows' : 'linux');
+            const isWin = targetOs === 'windows';
+            const winCmd = winCmdSelect?.value || 'set';
+
             const githubOptions = $('github-options-container');
             const githubInput = githubRepoInput;
             const appSettingsOptions = $('appsettings-options-container');
             const envDatalist = $('env-datalist');
+
+            if (winCmdContainer) winCmdContainer.style.display = isWin ? 'block' : 'none';
 
             // Initial load of environments if not done yet for this modal session
             if (appSettingsOptions && appSettingsOptions.style.display !== 'none' && envDatalist && envDatalist.children.length === 0) {
@@ -1305,11 +1321,30 @@ export class ModalManager {
                     jsonStr = jsonStr.replace(/\n\}$/, ',\n  "..." \n}');
                 }
                 text += jsonStr;
+            } else if (!isWin && currentMode === 'standard') {
+                // Linux format: cat <<EOF >> ~/.bashrc
+                text += `cat <<EOF >> ~/.bashrc\n`;
+                sample.forEach(v => {
+                    const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
+                    text += `export ${v.name}="${val}"\n`;
+                });
+                if (filteredVars.length > 3) text += `# ... and ${filteredVars.length - 3} more\n`;
+                text += `EOF\n\nsource ~/.bashrc\n`;
             } else {
                 sample.forEach(v => {
                     const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
                     if (currentMode === 'standard') {
-                        text += isWin ? `set ${v.name}=${val}\n` : `export ${v.name}="${val}"\n`;
+                        if (isWin) {
+                            if (winCmd === 'setx') {
+                                text += `setx ${v.name} "${val}"\n`;
+                            } else if (winCmd === 'powershell') {
+                                text += `[Environment]::SetEnvironmentVariable("${v.name}", "${val}", "User")\n`;
+                            } else {
+                                text += `set ${v.name}=${val}\n`;
+                            }
+                        } else {
+                            text += `export ${v.name}="${val}"\n`;
+                        }
                     } else if (currentMode === 'aws') {
                         text += `export AWS_${v.name.toUpperCase()}="${val}"\n`;
                     } else if (currentMode === 'azure') {
@@ -1320,23 +1355,29 @@ export class ModalManager {
                         text += `gh secret set ${v.name} -b"${val}"${repoFlag}\n`;
                     }
                 });
+                if (filteredVars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${filteredVars.length - 3} more\n`;
             }
 
             // Add pause to preview (unless it's terraform-style or appsettings)
-            if (currentMode !== 'terraform' && currentMode !== 'appsettings') {
+            if (currentMode !== 'terraform' && currentMode !== 'appsettings' && (isWin || (currentMode !== 'standard'))) {
                 text += '\n';
                 if (isWin) {
-                    text += `pause\n`;
+                    if (winCmd === 'powershell') {
+                        text += `Read-Host "Press any key to continue..."\n`;
+                    } else {
+                        text += `pause\n`;
+                    }
                 } else {
                     text += `read -p "Press any key to continue..."\n`;
                 }
             }
 
-            if (filteredVars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${filteredVars.length - 3} more`;
             if (preview) preview.textContent = text;
         };
 
         // Event listeners
+        if (osSelect) osSelect.onchange = updatePreview;
+        if (winCmdSelect) winCmdSelect.onchange = updatePreview;
         if (githubRepoInput) githubRepoInput.oninput = updatePreview;
         if (appSettingsEnvInput) appSettingsEnvInput.oninput = updatePreview;
         if (appSettingsIncludePrefixInput) appSettingsIncludePrefixInput.onchange = updatePreview;
@@ -1393,33 +1434,40 @@ export class ModalManager {
 
         const doExport = async (action: string) => {
             const currentMasked = maskCheckbox?.checked ?? isMasked;
+            const targetOs = osSelect?.value || 'windows';
+            const winCmd = winCmdSelect?.value || 'set';
+            
             let extra = '';
             if (currentMode === 'github') {
-                    extra = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
-                } else if (currentMode === 'appsettings') {
-                    const envInput = document.getElementById('appsettings-env-input') as HTMLInputElement;
-                    const env = envInput?.value || '';
-                    const includePrefix = (document.getElementById('appsettings-include-prefix') as HTMLInputElement)?.checked;
-                    extra = `${env}|${includePrefix}`;
+                extra = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
+            } else if (currentMode === 'appsettings') {
+                const envInput = document.getElementById('appsettings-env-input') as HTMLInputElement;
+                const env = envInput?.value || '';
+                const includePrefix = (document.getElementById('appsettings-include-prefix') as HTMLInputElement)?.checked;
+                extra = `${env}|${includePrefix}`;
 
-                    // Persistent addition of new environment
-                    if (env) {
-                        const envs = await window.electronAPI.getEnvironments();
-                        if (!envs.includes(env)) {
-                            envs.push(env);
-                            await window.electronAPI.saveEnvironments(envs);
-                        }
+                // Persistent addition of new environment
+                if (env) {
+                    const envs = await window.electronAPI.getEnvironments();
+                    if (!envs.includes(env)) {
+                        envs.push(env);
+                        await window.electronAPI.saveEnvironments(envs);
                     }
                 }
-                const currentExclude = excludeCheckbox?.checked ?? false;
-                const currentBlank = maskBlankCheckbox?.checked ?? false;
-                const res = await (window as any).electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra, action, currentExclude, currentBlank);
-                if (res.success) {
-                    if (action === 'save') showToast('Exported successfully');
-                    close();
-                } else if (res.error !== 'Cancelled' && res.error !== 'cancelled') {
-                    showToast(res.error || 'Failed to export', 'error');
-                }
+            } else {
+                // For standard export, pass OS and CMD info
+                extra = `${targetOs}|${winCmd}`;
+            }
+            
+            const currentExclude = excludeCheckbox?.checked ?? false;
+            const currentBlank = maskBlankCheckbox?.checked ?? false;
+            const res = await (window as any).electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra, action, currentExclude, currentBlank);
+            if (res.success) {
+                if (action === 'save') showToast('Exported successfully');
+                close();
+            } else if (res.error !== 'Cancelled' && res.error !== 'cancelled') {
+                showToast(res.error || 'Failed to export', 'error');
+            }
         };
 
         if (saveBtn) saveBtn.onclick = () => doExport('save');

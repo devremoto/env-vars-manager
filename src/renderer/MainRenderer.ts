@@ -251,7 +251,8 @@ export class MainRenderer {
                 if (format === 'script') {
                     this.modalManager.openScriptExportModal(varsToExport, isMasked);
                 } else {
-                    window.electronAPI.exportEnvVars(varsToExport, format, isMasked);
+                    const action = (['html', 'pdf', 'json', 'csv'].includes(format)) ? 'browser' : (format === 'docx' ? 'editor' : 'save');
+                    window.electronAPI.exportEnvVars(varsToExport, format, isMasked, undefined, undefined, action);
                 }
             }
         });

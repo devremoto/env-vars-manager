@@ -8,27 +8,21 @@ description: Guidelines for format-specific export actions (Browser vs Editor)
 The application provides different export actions (Save, Open in Editor, Open in Browser) based on the file format to ensure the best possible viewing and editing experience.
 
 ## 1. Format-Specific Defaults
-Even if a user selects a generic action, the application enforces format-specific overrides:
+To provide a seamless, "one-click" experience, the application bypasses the standard Electron "Save As" dialog for formats that are primarily intended for immediate viewing or editing.
 
-| Format | Preferred Action | Rationale |
+| Format | Default Action | UX Pattern |
 | :--- | :--- | :--- |
-| **HTML** | **Browser** | Browsers provide native rendering and consistent styling. |
-| **PDF** | **Browser** | Modern browsers have excellent built-in PDF viewers; prevents issues with missing standalone readers. |
-| **DOCX** | **Editor** | Browsers do not natively render Word documents; forcing the editor (like Word/LibreOffice) ensures the file is readable and editable. |
-| **Scripts** | **Browser (Preview)** | For ephemeral previews, scripts are served via a local HTTP server to the browser to avoid security/size limits of URL parameters. |
+| **HTML** | **Browser** | Skips save dialog; saves to `tmpdir`, and opens in system browser via `shell.openExternal`. |
+| **PDF** | **Browser** | Skips save dialog; saves to `tmpdir`, and opens in system browser via `shell.openExternal`. |
+| **JSON** | **Browser** | Skips save dialog; serves via local HTTP server or temporary file for browser consumption. |
+| **DOCX** | **Editor** | Skips save dialog; saves to `tmpdir`, and opens in default document editor (e.g. Word) via `shell.openPath`. |
 
-## 2. Implementation in `main.ts`
-When handling an export IPC call, always calculate the `actualAction`:
-```typescript
-// Example for HTML/PDF
-const actualAction = (finalAction === 'editor' || finalAction === 'browser') ? 'browser' : 'save';
-
-if (actualAction === 'browser') {
-    // Open in browser
-} else {
-    // Save only
-}
-```
+## 2. Implementation Logic
+- **Renderer (`MainRenderer.ts`)**: When the user selects a format from the `ExportDropdown`, detect if it is a view-centric format and pass `'browser'` or `'editor'` as the `action` parameter to the `exportEnvVars` IPC call.
+- **Main Process (`main.ts`)**:
+    - If `action === 'save'`, ALWAYS show the `dialog.showSaveDialog`.
+    - If `action === 'browser'` or `action === 'editor'`, ALWAYS skip the dialog and generate a temporary `filePath` using `os.tmpdir()` and a timestamp.
+    - After saving the file, use `shell.openExternal` for browsers (native rendering) and `shell.openPath` for editors.
 
 ## 3. Masking & Protection
 - Always respect the `isMasked` flag during export to hide sensitive data marked as protected.
