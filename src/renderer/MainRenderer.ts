@@ -251,7 +251,7 @@ export class MainRenderer {
                 if (format === 'script') {
                     this.modalManager.openScriptExportModal(varsToExport, isMasked);
                 } else {
-                    const action = (['html', 'pdf', 'json', 'csv'].includes(format)) ? 'browser' : (format === 'docx' ? 'editor' : 'save');
+                    const action = (['html', 'pdf', 'json', 'csv', 'txt'].includes(format)) ? 'browser' : (format === 'docx' ? 'editor' : 'save');
                     window.electronAPI.exportEnvVars(varsToExport, format, isMasked, undefined, undefined, action);
                 }
             }

@@ -149,7 +149,51 @@ export class EnvHandlers {
         });
 
         ipcMain.handle('get-protected-vars', () => this.getProtectedVarsList());
+
+        ipcMain.handle('protect-vars', (_event, names: string[], protect: boolean) => {
+            try {
+                let list = this.getProtectedVarsList();
+                if (protect) {
+                    names.forEach(name => { if (!list.includes(name)) list.push(name); });
+                } else {
+                    list = list.filter(n => !names.includes(n));
+                }
+                this.saveProtectedVarsList(list);
+                return { success: true };
+            } catch (err: any) {
+                return { success: false, error: err.message };
+            }
+        });
+
+        ipcMain.handle('unprotect-vars', (_event, names: string[]) => {
+            try {
+                let list = this.getProtectedVarsList();
+                list = list.filter(n => !names.includes(n));
+                this.saveProtectedVarsList(list);
+                return { success: true };
+            } catch (err: any) {
+                return { success: false, error: err.message };
+            }
+        });
+
+        ipcMain.handle('toggle-protected-var', (_event, name: string) => {
+            try {
+                let list = this.getProtectedVarsList();
+                const isProtected = list.includes(name);
+                if (isProtected) {
+                    list = list.filter(n => n !== name);
+                } else {
+                    list.push(name);
+                }
+                this.saveProtectedVarsList(list);
+                return { success: true, isProtected: !isProtected };
+            } catch (err: any) {
+                return { success: false, error: err.message };
+            }
+        });
+
     }
+
 
     private static getProtectedVarsList(): string[] {
         try {

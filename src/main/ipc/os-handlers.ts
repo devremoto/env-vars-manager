@@ -7,6 +7,20 @@ const execAsync = promisify(exec);
 
 export class OsHandlers {
     static register() {
+        ipcMain.handle('get-os-info', async (): Promise<any> => {
+            return {
+                type: os.type(),
+                platform: os.platform(),
+                release: os.release(),
+                arch: os.arch(),
+                hostname: os.hostname(),
+                homeDir: os.homedir(),
+                totalMem: (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2) + ' GB',
+                cpus: os.cpus().length,
+                uptime: (os.uptime() / 3600).toFixed(2) + ' hours'
+            };
+        });
+
         ipcMain.handle('check-is-admin', async (): Promise<boolean> => {
             if (os.platform() !== 'win32') {
                 return (process.getuid ? process.getuid() === 0 : false);

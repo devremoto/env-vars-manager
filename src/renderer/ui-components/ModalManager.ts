@@ -1225,154 +1225,164 @@ export class ModalManager {
         }
 
         const updatePreview = async () => {
-            const currentMaskedMaster = maskCheckbox?.checked ?? isMasked;
-            const currentExclude = excludeCheckbox?.checked ?? false;
-            const currentBlank = maskBlankCheckbox?.checked ?? false;
+            try {
+                const currentMaskedMaster = maskCheckbox?.checked ?? isMasked;
+                const currentExclude = excludeCheckbox?.checked ?? false;
+                const currentBlank = maskBlankCheckbox?.checked ?? false;
 
-            const filteredVars = currentExclude ? vars.filter(v => !v.isProtected) : vars;
-            const sample = filteredVars.slice(0, 3);
-            let text = '';
-            // Determine the final mask string to use
-            const maskString = currentBlank ? '' : '********';
-            const isActiveMasking = currentMaskedMaster && !currentExclude;
-            
-            const targetOs = osSelect?.value || (navigator.userAgent.toLowerCase().includes('win') ? 'windows' : 'linux');
-            const isWin = targetOs === 'windows';
-            const winCmd = winCmdSelect?.value || 'set';
-
-            const githubOptions = $('github-options-container');
-            const githubInput = githubRepoInput;
-            const appSettingsOptions = $('appsettings-options-container');
-            const envDatalist = $('env-datalist');
-
-            if (winCmdContainer) winCmdContainer.style.display = isWin ? 'block' : 'none';
-
-            // Initial load of environments if not done yet for this modal session
-            if (appSettingsOptions && appSettingsOptions.style.display !== 'none' && envDatalist && envDatalist.children.length === 0) {
-                const envs = await window.electronAPI.getEnvironments();
-                envDatalist.innerHTML = envs.map((e: string) => `<option value="${e}">`).join('');
-            }
-
-            if (githubOptions) {
-                githubOptions.style.display = currentMode === 'github' ? 'block' : 'none';
-            }
-            if (appSettingsOptions) {
-                appSettingsOptions.style.display = currentMode === 'appsettings' ? 'block' : 'none';
-            }
-
-            const repo = githubInput?.value || '';
-            const repoFlag = repo ? ` --repo ${repo}` : '';
-            const env = appSettingsEnvInput?.value || '';
-            const includePrefix = appSettingsIncludePrefixInput?.checked ?? true;
-
-            if (currentMode === 'github') {
-                text += `echo Y | gh auth login --web --git-protocol https\n\n`;
-            }
-
-            if (currentMode === 'appsettings') {
-                const fileName = env ? `appsettings.${env}.json` : 'appsettings.json';
-                text = `// File: ${fileName}\n`;
+                const filteredVars = currentExclude ? vars.filter(v => !v.isProtected) : vars;
+                const sample = filteredVars.slice(0, 3);
+                let text = '';
+                // Determine the final mask string to use
+                const maskString = currentBlank ? '' : '********';
+                const isActiveMasking = currentMaskedMaster && !currentExclude;
                 
-                // Build hierarchy and handle array conversion (matching main.ts logic)
-                const data: any = {};
-                sample.forEach(v => {
-                    let name = v.name;
-                    if (!includePrefix) {
-                        const parts = name.split(/__|:/).filter((p: string) => !!p);
-                        if (parts.length > 1) name = parts.slice(1).join('__');
-                    }
+                const targetOs = osSelect?.value || (navigator.userAgent.toLowerCase().includes('win') ? 'windows' : 'linux');
+                const isWin = targetOs === 'windows';
+                const winCmd = winCmdSelect?.value || 'set';
+
+                const githubOptions = $('github-options-container');
+                const githubInput = githubRepoInput;
+                const appSettingsOptions = $('appsettings-options-container');
+                const envDatalist = $('env-datalist');
+
+                if (winCmdContainer) winCmdContainer.style.display = isWin ? 'block' : 'none';
+
+                // Show/hide OS selection container based on mode
+                const osSelectionContainer = $('os-selection-container');
+                if (osSelectionContainer) {
+                    osSelectionContainer.style.display = currentMode === 'standard' ? 'grid' : 'none';
+                }
+
+                // Initial load of environments if not done yet for this modal session
+                if (appSettingsOptions && appSettingsOptions.style.display !== 'none' && envDatalist && envDatalist.children.length === 0) {
+                    const envs = await window.electronAPI.getEnvironments();
+                    envDatalist.innerHTML = envs.map((e: string) => `<option value="${e}">`).join('');
+                }
+
+                if (githubOptions) {
+                    githubOptions.style.display = currentMode === 'github' ? 'block' : 'none';
+                }
+                if (appSettingsOptions) {
+                    appSettingsOptions.style.display = currentMode === 'appsettings' ? 'block' : 'none';
+                }
+
+                const repo = githubInput?.value || '';
+                const repoFlag = repo ? ` --repo ${repo}` : '';
+                const env = appSettingsEnvInput?.value || '';
+                const includePrefix = appSettingsIncludePrefixInput?.checked ?? true;
+
+                if (currentMode === 'github') {
+                    text += `echo Y | gh auth login --web --git-protocol https\n\n`;
+                }
+
+                if (currentMode === 'appsettings') {
+                    const fileName = env ? `appsettings.${env}.json` : 'appsettings.json';
+                    text = `// File: ${fileName}\n`;
                     
-                    const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
-                    const pathParts = name.split(/__|:/).filter((p: string) => !!p);
-                    let curr = data;
-                    for (let i = 0; i < pathParts.length; i++) {
-                        const seg = pathParts[i];
-                        if (i === pathParts.length - 1) {
-                            curr[seg] = val;
-                        } else {
-                            if (!curr[seg] || typeof curr[seg] !== 'object') curr[seg] = {};
-                            curr = curr[seg];
+                    // Build hierarchy and handle array conversion (matching main.ts logic)
+                    const data: any = {};
+                    sample.forEach(v => {
+                        let name = v.name;
+                        if (!includePrefix) {
+                            const parts = name.split(/__|:/).filter((p: string) => !!p);
+                            if (parts.length > 1) name = parts.slice(1).join('__');
                         }
-                    }
-                });
-
-                const convertToArray = (obj: any): any => {
-                    if (obj === null || typeof obj !== 'object') return obj;
-                    const keys = Object.keys(obj);
-                    const isAllNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
-                    if (isAllNumeric) {
-                        const sortedKeys = keys.map(Number).sort((a,b) => a-b);
-                        const minKey = sortedKeys[0];
-                        const arr: any[] = [];
-                        keys.forEach(k => {
-                            const index = parseInt(k, 10);
-                            const arrayIdx = minKey === 1 ? index - 1 : index;
-                            if (arrayIdx >= 0) arr[arrayIdx] = convertToArray(obj[k]);
-                        });
-                        return arr;
-                    }
-                    Object.keys(obj).forEach(k => { obj[k] = convertToArray(obj[k]); });
-                    return obj;
-                };
-
-                const finalData = convertToArray(data);
-                let jsonStr = JSON.stringify(finalData, null, 2);
-                if (filteredVars.length > 3) {
-                    jsonStr = jsonStr.replace(/\n\}$/, ',\n  "..." \n}');
-                }
-                text += jsonStr;
-            } else if (!isWin && currentMode === 'standard') {
-                // Linux format: cat <<EOF >> ~/.bashrc
-                text += `cat <<EOF >> ~/.bashrc\n`;
-                sample.forEach(v => {
-                    const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
-                    text += `export ${v.name}="${val}"\n`;
-                });
-                if (filteredVars.length > 3) text += `# ... and ${filteredVars.length - 3} more\n`;
-                text += `EOF\n\nsource ~/.bashrc\n`;
-            } else {
-                sample.forEach(v => {
-                    const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
-                    if (currentMode === 'standard') {
-                        if (isWin) {
-                            if (winCmd === 'setx') {
-                                text += `setx ${v.name} "${val}"\n`;
-                            } else if (winCmd === 'powershell') {
-                                text += `[Environment]::SetEnvironmentVariable("${v.name}", "${val}", "User")\n`;
+                        
+                        const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
+                        const pathParts = name.split(/__|:/).filter((p: string) => !!p);
+                        let curr = data;
+                        for (let i = 0; i < pathParts.length; i++) {
+                            const seg = pathParts[i];
+                            if (i === pathParts.length - 1) {
+                                curr[seg] = val;
                             } else {
-                                text += `set ${v.name}=${val}\n`;
+                                if (!curr[seg] || typeof curr[seg] !== 'object') curr[seg] = {};
+                                curr = curr[seg];
                             }
-                        } else {
-                            text += `export ${v.name}="${val}"\n`;
                         }
-                    } else if (currentMode === 'aws') {
-                        text += `export AWS_${v.name.toUpperCase()}="${val}"\n`;
-                    } else if (currentMode === 'azure') {
-                        text += `az configure --defaults ${v.name}="${val}"\n`;
-                    } else if (currentMode === 'terraform') {
-                        text += `export TF_VAR_${v.name.toLowerCase()}="${val}"\n`;
-                    } else if (currentMode === 'github') {
-                        text += `gh secret set ${v.name} -b"${val}"${repoFlag}\n`;
-                    }
-                });
-                if (filteredVars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${filteredVars.length - 3} more\n`;
-            }
+                    });
 
-            // Add pause to preview (unless it's terraform-style or appsettings)
-            if (currentMode !== 'terraform' && currentMode !== 'appsettings' && (isWin || (currentMode !== 'standard'))) {
-                text += '\n';
-                if (isWin) {
-                    if (winCmd === 'powershell') {
-                        text += `Read-Host "Press any key to continue..."\n`;
-                    } else {
-                        text += `pause\n`;
+                    const convertToArray = (obj: any): any => {
+                        if (obj === null || typeof obj !== 'object') return obj;
+                        const keys = Object.keys(obj);
+                        const isAllNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                        if (isAllNumeric) {
+                            const sortedKeys = keys.map(Number).sort((a,b) => a-b);
+                            const minKey = sortedKeys[0];
+                            const arr: any[] = [];
+                            keys.forEach(k => {
+                                const index = parseInt(k, 10);
+                                const arrayIdx = minKey === 1 ? index - 1 : index;
+                                if (arrayIdx >= 0) arr[arrayIdx] = convertToArray(obj[k]);
+                            });
+                            return arr;
+                        }
+                        Object.keys(obj).forEach(k => { obj[k] = convertToArray(obj[k]); });
+                        return obj;
+                    };
+
+                    const finalData = convertToArray(data);
+                    let jsonStr = JSON.stringify(finalData, null, 2);
+                    if (filteredVars.length > 3) {
+                        jsonStr = jsonStr.replace(/\n\}$/, ',\n  "..." \n}');
                     }
+                    text += jsonStr;
+                } else if (!isWin && currentMode === 'standard') {
+                    // Linux format: cat <<EOF >> ~/.bashrc
+                    text += `cat <<EOF >> ~/.bashrc\n`;
+                    sample.forEach(v => {
+                        const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
+                        text += `export ${v.name}="${val}"\n`;
+                    });
+                    if (filteredVars.length > 3) text += `# ... and ${filteredVars.length - 3} more\n`;
+                    text += `EOF\n\nsource ~/.bashrc\n`;
                 } else {
-                    text += `read -p "Press any key to continue..."\n`;
+                    sample.forEach(v => {
+                        const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
+                        if (currentMode === 'standard') {
+                            if (isWin) {
+                                if (winCmd === 'setx') {
+                                    text += `setx ${v.name} "${val}"\n`;
+                                } else if (winCmd === 'powershell') {
+                                    text += `[Environment]::SetEnvironmentVariable("${v.name}", "${val}", "User")\n`;
+                                } else {
+                                    text += `set ${v.name}=${val}\n`;
+                                }
+                            } else {
+                                text += `export ${v.name}="${val}"\n`;
+                            }
+                        } else if (currentMode === 'aws') {
+                            text += `export AWS_${v.name.toUpperCase()}="${val}"\n`;
+                        } else if (currentMode === 'azure') {
+                            text += `az configure --defaults ${v.name}="${val}"\n`;
+                        } else if (currentMode === 'terraform') {
+                            text += `export TF_VAR_${v.name.toLowerCase()}="${val}"\n`;
+                        } else if (currentMode === 'github') {
+                            text += `gh secret set ${v.name} -b"${val}"${repoFlag}\n`;
+                        }
+                    });
+                    if (filteredVars.length > 3 && currentMode !== 'appsettings') text += `# ... and ${filteredVars.length - 3} more\n`;
                 }
-            }
 
-            if (preview) preview.textContent = text;
+                // Add pause to preview (unless it's terraform-style or appsettings)
+                if (currentMode !== 'terraform' && currentMode !== 'appsettings' && (isWin || (currentMode !== 'standard'))) {
+                    text += '\n';
+                    if (isWin) {
+                        if (winCmd === 'powershell') {
+                            text += `Read-Host "Press any key to continue..."\n`;
+                        } else {
+                            text += `pause\n`;
+                        }
+                    } else {
+                        text += `read -p "Press any key to continue..."\n`;
+                    }
+                }
+
+                if (preview) preview.textContent = text;
+            } catch (err: any) {
+                console.error("updatePreview failed:", err);
+            }
         };
 
         // Event listeners

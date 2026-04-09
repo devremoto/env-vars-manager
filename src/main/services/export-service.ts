@@ -68,10 +68,17 @@ export class ExportService {
                 const isWin = targetOs === 'windows';
 
                 let filename = isWin ? 'export.bat' : 'export.sh';
+                let contentType = 'text/plain';
+                
                 if (mode === 'terraform') filename = 'variables.tfvars';
                 if (isWin && winCmd === 'powershell') filename = 'export.ps1';
+                if (mode === 'appsettings') {
+                    const env = (extraParam || '').split('|')[0];
+                    filename = env ? `appsettings.${env}.json` : 'appsettings.json';
+                    contentType = 'application/json';
+                }
                 
-                openInBrowserWithLocalServer(content, 'text/plain', filename);
+                openInBrowserWithLocalServer(content, contentType, filename);
                 return { success: true };
             } else if (filePath) {
                 fs.writeFileSync(filePath, content, 'utf-8');
@@ -92,10 +99,73 @@ export class ExportService {
             return { success: true, filePath };
         }
 
+        // PDF Export — open in browser
+        if (format === 'pdf') {
+            const htmlContent = this.generateHtml(maskedVars);
+            if (finalAction === 'browser') {
+                openInBrowserWithLocalServer(htmlContent, 'text/html', 'export.pdf.html');
+                return { success: true };
+            }
+            if (filePath) fs.writeFileSync(filePath, htmlContent, 'utf-8');
+            if (finalAction === 'editor' && filePath) shell.openPath(filePath);
+            return { success: true, filePath };
+        }
+
+
+
         return { success: false, error: 'Unsupported format or missing parameters' };
     }
 
     private static generateScript(maskedVars: any[], mode: string, extraParam: string): string {
+        if (mode === 'appsettings') {
+            const [env, includePrefixStr] = (extraParam || '').split('|');
+            const includePrefix = includePrefixStr !== 'false';
+            
+            const data: any = {};
+            maskedVars.forEach(v => {
+                let name = v.name;
+                if (!includePrefix) {
+                    const parts = name.split(/__|:/).filter((p: string) => !!p);
+                    if (parts.length > 1) name = parts.slice(1).join('__');
+                }
+                
+                const val = v.value;
+                const pathParts = name.split(/__|:/).filter((p: string) => !!p);
+                let curr = data;
+                for (let i = 0; i < pathParts.length; i++) {
+                    const seg = pathParts[i];
+                    if (i === pathParts.length - 1) {
+                        curr[seg] = val;
+                    } else {
+                        if (!curr[seg] || typeof curr[seg] !== 'object') curr[seg] = {};
+                        curr = curr[seg];
+                    }
+                }
+            });
+
+            const convertToArray = (obj: any): any => {
+                if (obj === null || typeof obj !== 'object') return obj;
+                const keys = Object.keys(obj);
+                const isAllNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                if (isAllNumeric) {
+                    const sortedKeys = keys.map(Number).sort((a,b) => a-b);
+                    const minKey = sortedKeys[0];
+                    const arr: any[] = [];
+                    keys.forEach(k => {
+                        const index = parseInt(k, 10);
+                        const arrayIdx = minKey === 1 ? index - 1 : index;
+                        if (arrayIdx >= 0) arr[arrayIdx] = convertToArray(obj[k]);
+                    });
+                    return arr;
+                }
+                Object.keys(obj).forEach(k => { obj[k] = convertToArray(obj[k]); });
+                return obj;
+            };
+
+            const finalData = convertToArray(data);
+            return JSON.stringify(finalData, null, 2) + '\n';
+        }
+
         let [targetOs, winCmd] = (mode === 'standard' || mode === 'aws' || mode === 'azure' || mode === 'terraform') 
             ? (extraParam || '|').split('|') 
             : [os.platform() === 'win32' ? 'windows' : 'linux', 'set'];
@@ -138,8 +208,7 @@ export class ExportService {
                 line = `gh secret set ${name} -b"${val}"${repoFlag}`;
             }
 
-            if (v.isProtected) lines.push(isWin ? `REM ${line}` : `# ${line}`);
-            else lines.push(line);
+            lines.push(line);
         });
 
         if (!isWin && mode === 'standard') {
@@ -183,3 +252,4 @@ export class ExportService {
         </style></head><body><div class="table-card"><table>${rows}</table></div></body></html>`;
     }
 }
+
