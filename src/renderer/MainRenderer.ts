@@ -37,26 +37,48 @@ export class MainRenderer {
         (window as any).openHistoryModal = (name?: string) => this.modalManager.openHistoryModal(name);
         (window as any).openOptimizeModal = (name: string) => this.modalManager.openOptimizeModal(name);
         (window as any).openImportReviewModal = (vars: any, options?: any) => this.modalManager.openImportReviewModal(vars, options);
-        
+
         (window as any).openDeleteConfirm = (names: string[]) => {
             const count = names.length;
             if (count === 0) return;
 
-            const message = count === 1 
+            const message = count === 1
                 ? `Are you sure you want to delete "${names[0]}"?`
                 : `Are you sure you want to delete ${count} items? (${names.slice(0, 3).join(', ')}${count > 3 ? '...' : ''})`;
-            
+
             this.modalManager.openConfirmModal(
                 message,
                 async () => {
                     showToast(`Deleting ${count} items...`);
-                    let successCount = 0;
+                    const userNames: string[] = [];
+                    const systemNames: string[] = [];
                     for (const name of names) {
                         const v = getVarById(name);
-                        const res = await window.electronAPI.deleteEnvVar(name, v?.isSystem || false);
-                        if (res.success) successCount++;
+                        if (v?.isSystem) systemNames.push(name);
+                        else userNames.push(name);
                     }
+
+                    let successCount = 0;
+                    let errorMessage = '';
+
+                    if (userNames.length > 0) {
+                        const res = await window.electronAPI.deleteVars(userNames, false);
+                        successCount += res.count || 0;
+                        if (!res.success && res.error) errorMessage = res.error;
+                    }
+
+                    if (systemNames.length > 0) {
+                        const res = await window.electronAPI.deleteVars(systemNames, true);
+                        successCount += res.count || 0;
+                        if (!res.success && res.error) {
+                            errorMessage = errorMessage ? `${errorMessage} | ${res.error}` : res.error;
+                        }
+                    }
+
                     showToast(`Deleted ${successCount} variables`);
+                    if (errorMessage) {
+                        showToast(errorMessage, 'error');
+                    }
                     await actionService.loadEnvVars(true);
                     state.selectedVars.clear();
                     state.selectedFolders.clear();
@@ -64,7 +86,7 @@ export class MainRenderer {
                 }
             );
         };
-        (window as any).showContextMenu = (e: MouseEvent, name: string, isFolder: boolean, isFolderAllProtected?: boolean) => 
+        (window as any).showContextMenu = (e: MouseEvent, name: string, isFolder: boolean, isFolderAllProtected?: boolean) =>
             this.contextMenu.show(e, name, isFolder, isFolderAllProtected ?? false);
         (window as any).updateToolbarButtons = () => this.updateToolbarButtons();
         (window as any).handleCopyFeedback = (btn: HTMLButtonElement) => handleCopyFeedback(btn);
@@ -105,7 +127,7 @@ export class MainRenderer {
             $('os-memory').textContent = osInfo.totalMem;
             $('os-cpus').textContent = osInfo.cpus.toString();
             $('os-uptime').textContent = osInfo.uptime;
-            
+
             // Update icon based on platform
             const osIcon = $('os-icon');
             if (osInfo.platform === 'win32') {
@@ -153,7 +175,7 @@ export class MainRenderer {
         // Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
             const isCtrl = e.ctrlKey || e.metaKey;
-            
+
             // Key identification
             const key = e.key.toLowerCase();
 
@@ -166,7 +188,7 @@ export class MainRenderer {
             } else if (isCtrl && key === 'a') {
                 // Ignore if in input
                 if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
-                
+
                 e.preventDefault();
                 if (state.currentView === 'folder') {
                     this.explorer.selectAll();
@@ -188,7 +210,7 @@ export class MainRenderer {
         // Search
         const searchInput = $('search-input') as HTMLInputElement;
         const btnClearSearch = $('btn-clear-search');
-        
+
         searchInput.oninput = (e) => {
             state.searchQuery = (e.target as HTMLInputElement).value;
             btnClearSearch.style.display = state.searchQuery ? 'flex' : 'none';
@@ -211,9 +233,19 @@ export class MainRenderer {
         $('btn-auto-protect').onclick = () => this.handleAutoProtect();
         $('btn-import').onclick = () => importService.openImportModal();
 
+        // React to external env changes from main process
+        if ((window as any).electronAPI?.onEnvUpdated) {
+            window.electronAPI.onEnvUpdated(async () => {
+                await actionService.loadEnvVars(true);
+                state.selectedVars.clear();
+                state.selectedFolders.clear();
+                state.notify();
+            });
+        }
+
         window.onclick = () => {
-             const m = $('folder-sort-menu');
-             if (m) m.style.display = 'none';
+            const m = $('folder-sort-menu');
+            if (m) m.style.display = 'none';
         };
 
         // Toggle Groups (Collapse/Expand All)
@@ -319,14 +351,14 @@ export class MainRenderer {
                 groupName: Object.entries(state.groups).find(([_, names]) => names.includes(v.name))?.[0]
             }));
         }
-        
+
         return state.filteredVars;
     }
 
     private initResizablePanels() {
         // Sidebar Resizer
         const sidebarResizer = $('resizer-sidebar');
-        
+
         sidebarResizer.onmousedown = (e) => {
             e.preventDefault();
             state.isDraggingSidebar = true;
@@ -339,7 +371,7 @@ export class MainRenderer {
 
         // Details Resizer
         const detailsResizer = $('resizer-details');
-        
+
         detailsResizer.onmousedown = (e) => {
             e.preventDefault();
             state.isDraggingDetails = true;
@@ -354,7 +386,7 @@ export class MainRenderer {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
                 const active = document.activeElement as HTMLElement;
                 if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
-                
+
                 e.preventDefault();
                 this.selectAllAction();
             }
@@ -374,10 +406,10 @@ export class MainRenderer {
         const minWidth = 100;
         const maxWidth = 400;
         let newWidth = e.clientX - explorerSidebar.getBoundingClientRect().left;
-        
+
         if (newWidth < minWidth) newWidth = minWidth;
         if (newWidth > maxWidth) newWidth = maxWidth;
-        
+
         explorerSidebar.style.width = `${newWidth}px`;
     };
 
@@ -385,19 +417,19 @@ export class MainRenderer {
         const explorerDetails = $('explorer-details');
         const minWidth = 150;
         const maxWidth = 500;
-        
+
         let newWidth = explorerDetails.getBoundingClientRect().right - e.clientX;
-        
+
         if (newWidth < minWidth) newWidth = minWidth;
         if (newWidth > maxWidth) newWidth = maxWidth;
-        
+
         explorerDetails.style.width = `${newWidth}px`;
     };
 
     private async handleAutoProtect() {
         const { SENSITIVE_KEYWORDS } = await import('./utils.js');
         const { showToast, showLoading } = await import('./utils.js');
-        
+
         showLoading(true, 'Identifying sensitive data...');
         const namesToProtect = state.allEnvVars
             .filter(v => {
@@ -420,15 +452,15 @@ export class MainRenderer {
 
     private render() {
         debugLog(`render() started. View: ${state.currentView}. Total: ${state.allEnvVars.length}`);
-        
+
         state.filteredVars = this.filterAndSortVars();
-        
+
         const total = state.allEnvVars.length;
         const count = state.filteredVars.length;
-        
+
         const filteredCountEl = $('filtered-count');
         const totalVarsEl = $('total-vars');
-        
+
         if (filteredCountEl) filteredCountEl.textContent = count.toString();
         if (totalVarsEl) totalVarsEl.textContent = total.toString();
 
@@ -440,28 +472,28 @@ export class MainRenderer {
         if (state.currentView === 'list') {
             listContainer.style.display = 'block';
             folderContainer.style.display = 'none';
-            
+
             tabList.classList.add('active');
             tabList.style.background = 'var(--accent-primary)';
             tabList.style.color = 'white';
-            
+
             tabFolder.classList.remove('active');
             tabFolder.style.background = 'transparent';
             tabFolder.style.color = 'var(--text-secondary)';
-            
+
             this.tableView.render();
         } else {
             listContainer.style.display = 'none';
             folderContainer.style.display = 'flex';
-            
+
             tabFolder.classList.add('active');
             tabFolder.style.background = 'var(--accent-primary)';
             tabFolder.style.color = 'white';
-            
+
             tabList.classList.remove('active');
             tabList.style.background = 'transparent';
             tabList.style.color = 'var(--text-secondary)';
-            
+
             this.explorer.render();
         }
 
@@ -471,7 +503,7 @@ export class MainRenderer {
         const btnAdmin = $('btn-admin-mode');
         const adminText = $('admin-mode-text');
         const adminContainer = $('admin-mode-container');
-        
+
         if (state.isAdmin) {
             if (adminContainer) adminContainer.style.display = 'block';
             if (adminText) adminText.textContent = 'Admin Mode';
@@ -490,10 +522,10 @@ export class MainRenderer {
     private filterAndSortVars(): any[] {
         const query = state.searchQuery.toLowerCase();
         const folderQuery = state.folderSearchQuery.toLowerCase();
-        
+
         let filtered = state.allEnvVars.filter(v => {
             if (!v) return false;
-            
+
             // Filter out system variables if not in Admin Mode (User Mode)
             if (!state.isAdmin && v.isSystem) return false;
 
@@ -501,12 +533,12 @@ export class MainRenderer {
             const value = (v.value || '').toLowerCase();
             const matchesSearch = name.includes(query) || value.includes(query);
             const matchesFolderSearch = !folderQuery || name.includes(folderQuery) || value.includes(folderQuery);
-            
+
             if (state.currentView === 'folder' && state.explorerPath.length > 0) {
                 const prefix = state.explorerPath.join('_') + '_';
                 return matchesSearch && matchesFolderSearch && name.startsWith(prefix.toLowerCase());
             }
-            
+
             return matchesSearch && matchesFolderSearch;
         });
 
@@ -542,7 +574,7 @@ export class MainRenderer {
         const hasVarSelection = state.selectedVars.size > 0;
         const hasFolderSelection = state.selectedFolders.size > 0;
         const canGroup = state.selectedVars.size >= 2;
-        
+
         const btnCloneBulk = $('btn-clone-bulk') as HTMLButtonElement;
         if (btnCloneBulk) {
             btnCloneBulk.style.display = hasVarSelection ? 'inline-flex' : 'none';
@@ -569,8 +601,8 @@ export class MainRenderer {
                 const normalized = f.replace(/\//g, '__');
                 const normalizedAlt = f.replace(/\//g, ':');
                 return state.groups[normalized] || state.groups[`${normalized} Vars`] ||
-                       state.groups[normalizedAlt] || state.groups[`${normalizedAlt} Vars`] ||
-                       groupNames.some(g => g.startsWith(normalized) || g.startsWith(normalizedAlt));
+                    state.groups[normalizedAlt] || state.groups[`${normalizedAlt} Vars`] ||
+                    groupNames.some(g => g.startsWith(normalized) || g.startsWith(normalizedAlt));
             });
 
             const hasSelectedVarGroup = Array.from(state.selectedVars).some(v => {
@@ -591,7 +623,7 @@ export class MainRenderer {
                 const allFoldersWithVars = new Set<string>();
                 state.allEnvVars.forEach(v => {
                     const parts = splitVarName(v.name);
-                    for(let i=1; i<parts.length; i++) {
+                    for (let i = 1; i < parts.length; i++) {
                         allFoldersWithVars.add(parts.slice(0, i).join('/'));
                     }
                 });

@@ -31,4 +31,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getVarHistory: (varName?: string) => ipcRenderer.invoke('get-var-history', varName),
     restoreVar: (historyId: string) => ipcRenderer.invoke('restore-var', historyId),
     deleteHistory: (ids: string[]) => ipcRenderer.invoke('delete-history', ids),
+    onEnvUpdated: (callback: (...args: any[]) => void) => ipcRenderer.on('env-updated', (_e, ...args) => callback(...args)),
 });

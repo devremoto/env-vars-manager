@@ -6,7 +6,7 @@ export class ActionService {
     private isFirstLoad = true;
     private modalManager: any = null;
 
-    constructor() {}
+    constructor() { }
 
     public setModalManager(mm: any) {
         this.modalManager = mm;
@@ -16,12 +16,12 @@ export class ActionService {
         try {
             const vars = await window.electronAPI.getEnvVars();
             state.allEnvVars = vars;
-            
+
             const protectedList = await window.electronAPI.getProtectedVars();
             state.protectedVars = new Set(protectedList);
-            
+
             state.groups = await window.electronAPI.getGroups();
-            
+
             // Initial collapse: only on first app startup
             if (this.isFirstLoad) {
                 Object.keys(state.groups).forEach(g => state.collapsedGroups.add(g));
@@ -94,7 +94,7 @@ export class ActionService {
 
     async deleteSelected() {
         if (state.selectedVars.size === 0 && !state.selectedExplorerVar) return;
-        
+
         const varsToDelete: EnvVar[] = [];
         let folderName = '';
 
@@ -121,7 +121,7 @@ export class ActionService {
 
         if (varsToDelete.length === 0) return;
 
-        const confirmMsg = folderName 
+        const confirmMsg = folderName
             ? `Are you sure you want to delete folder "${folderName}" and its ${varsToDelete.length} variables?`
             : `Are you sure you want to delete ${varsToDelete.length} selected item(s)?`;
 
@@ -133,13 +133,25 @@ export class ActionService {
         let failCount = 0;
         let lastError = '';
 
-        for (const v of varsToDelete) {
-            const result = await window.electronAPI.deleteEnvVar(v.name, v.isSystem);
-            if (result.success) {
-                successCount++;
-            } else {
-                failCount++;
+        const userNames = varsToDelete.filter(v => !v.isSystem).map(v => v.name);
+        const systemNames = varsToDelete.filter(v => !!v.isSystem).map(v => v.name);
+
+        if (userNames.length > 0) {
+            const result = await window.electronAPI.deleteVars(userNames, false);
+            successCount += result.count || 0;
+            if (!result.success) {
+                failCount += Math.max(0, userNames.length - (result.count || 0));
                 lastError = result.error || 'Unknown error';
+            }
+        }
+
+        if (systemNames.length > 0) {
+            const result = await window.electronAPI.deleteVars(systemNames, true);
+            successCount += result.count || 0;
+            if (!result.success) {
+                failCount += Math.max(0, systemNames.length - (result.count || 0));
+                const systemError = result.error || 'Unknown error';
+                lastError = lastError ? `${lastError} | ${systemError}` : systemError;
             }
         }
 
