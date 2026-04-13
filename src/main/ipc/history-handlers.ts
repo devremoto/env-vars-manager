@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import * as os from 'os';
-import { getHistory, getHistoryById, logHistory, deleteHistory, upsertVariable, getVariableByName } from '../../db';
+import { getHistory, getHistoryById, logHistory, deleteHistory, deleteHistoryByDay, upsertVariable, getVariableByName } from '../../db';
 import { SystemProfileService } from '../services/system-profile-service';
 
 export class HistoryHandlers {
@@ -13,10 +13,10 @@ export class HistoryHandlers {
             const record = await getHistoryById(historyId);
             if (!record) throw new Error('Invalid history record');
 
-            const valToRestore = (record.operation === 'UPDATE' || record.operation === 'RESTORE' || record.operation === 'OPTIMIZE') 
-                ? record.old_value 
+            const valToRestore = (record.operation === 'UPDATE' || record.operation === 'RESTORE' || record.operation === 'OPTIMIZE')
+                ? record.old_value
                 : (record.new_value !== null ? record.new_value : record.old_value);
-            
+
             if (valToRestore === null) throw new Error('This record has no value to restore');
 
             const { variable_name } = record;
@@ -36,6 +36,11 @@ export class HistoryHandlers {
         ipcMain.handle('delete-history', async (_event, ids) => {
             await deleteHistory(ids);
             return { success: true };
+        });
+
+        ipcMain.handle('delete-history-by-day', async (_event, dayISO) => {
+            const deleted = await deleteHistoryByDay(dayISO);
+            return { success: true, count: deleted };
         });
     }
 }

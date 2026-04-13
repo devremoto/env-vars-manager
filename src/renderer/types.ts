@@ -27,6 +27,7 @@ export interface ElectronAPI {
     getVarHistory: (name?: string) => Promise<any[]>;
     restoreVar: (historyId: string) => Promise<{ success: boolean; error?: string }>;
     deleteHistory: (ids: string[]) => Promise<{ success: boolean; error?: string }>;
+    deleteHistoryByDay: (dayISO: string) => Promise<{ success: boolean; count: number; error?: string }>;
     getOsVars: () => Promise<Record<string, string>>;
     onEnvUpdated: (callback: (...args: any[]) => void) => void;
 }

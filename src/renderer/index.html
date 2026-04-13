@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Environment Variables Manager</title>
-    <link rel="stylesheet" href="styles.css">
-    <style>
+    <head>
+        <meta charset="UTF-8">
+        <title>Environment Variables Manager</title>
+        <link rel="stylesheet" href="styles.css">
+        <style>
         /* Essential layout fixes for stability */
         .title-bar {
             height: 32px;
@@ -33,263 +33,437 @@
         .app-container { padding-top: 32px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         .main-content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     </style>
-</head>
-<body class="theme-dark">
-    <!-- Frame -->
-    <div class="title-bar">
-        <div class="window-controls">
-            <button id="btn-minimize" class="win-btn">—</button>
-            <button id="btn-maximize" class="win-btn">▢</button>
-            <button id="btn-close" class="win-btn close">&times;</button>
+    </head>
+    <body class="theme-dark">
+        <!-- Frame -->
+        <div class="title-bar">
+            <div class="window-controls">
+                <button id="btn-minimize" class="win-btn">—</button>
+                <button id="btn-maximize" class="win-btn">▢</button>
+                <button id="btn-close" class="win-btn close">&times;</button>
+            </div>
         </div>
-    </div>
 
-    <!-- UI States -->
-    <div id="loading-indicator" class="loading-indicator" style="display: none;">
-        <div class="spinner"></div><span>Loading...</span>
-    </div>
-    <div id="toast-container" class="toast-container"></div>
+        <!-- UI States -->
+        <div id="loading-indicator" class="loading-indicator"
+            style="display: none;">
+            <div class="spinner"></div><span>Loading...</span>
+        </div>
+        <div id="toast-container" class="toast-container"></div>
 
-    <div class="app-container">
-        <!-- OS Status -->
-        <div class="os-panel" id="os-panel">
-            <div class="os-panel-header">
-                <div class="os-badge" id="os-badge">
-                    <span class="os-icon" id="os-icon">🪟</span>
-                    <span class="os-name" id="os-name">Detecting OS...</span>
+        <div class="app-container">
+            <!-- OS Status -->
+            <div class="os-panel" id="os-panel">
+                <div class="os-panel-header">
+                    <div class="os-badge" id="os-badge">
+                        <span class="os-icon" id="os-icon">🪟</span>
+                        <span class="os-name" id="os-name">Detecting
+                            OS...</span>
+                    </div>
+                </div>
+                <div class="os-details" id="os-details">
+                    <div class="os-detail-item"><span
+                            class="os-label">Platform</span><span
+                            class="os-value" id="os-platform">-</span></div>
+                    <div class="os-detail-item"><span
+                            class="os-label">Arch</span><span class="os-value"
+                            id="os-arch">-</span></div>
+                    <div class="os-detail-item"><span
+                            class="os-label">Hostname</span><span
+                            class="os-value" id="os-hostname">-</span></div>
+                    <div class="os-detail-item"><span
+                            class="os-label">Memory</span><span class="os-value"
+                            id="os-memory">-</span></div>
+                    <div class="os-detail-item"><span
+                            class="os-label">CPUs</span><span class="os-value"
+                            id="os-cpus">-</span></div>
+                    <div class="os-detail-item"><span
+                            class="os-label">Uptime</span><span class="os-value"
+                            id="os-uptime">-</span></div>
                 </div>
             </div>
-            <div class="os-details" id="os-details">
-                <div class="os-detail-item"><span class="os-label">Platform</span><span class="os-value" id="os-platform">-</span></div>
-                <div class="os-detail-item"><span class="os-label">Arch</span><span class="os-value" id="os-arch">-</span></div>
-                <div class="os-detail-item"><span class="os-label">Hostname</span><span class="os-value" id="os-hostname">-</span></div>
-                <div class="os-detail-item"><span class="os-label">Memory</span><span class="os-value" id="os-memory">-</span></div>
-                <div class="os-detail-item"><span class="os-label">CPUs</span><span class="os-value" id="os-cpus">-</span></div>
-                <div class="os-detail-item"><span class="os-label">Uptime</span><span class="os-value" id="os-uptime">-</span></div>
-            </div>
-        </div>
 
-        <!-- Master Toolbar -->
-        <div class="toolbar">
-            <div class="toolbar-left">
-                <div class="view-tabs">
-                    <button class="view-tab" id="view-folder" title="Folder View">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                </button>
-                <button class="view-tab active" id="view-list" title="Table View">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                </button>
+            <!-- Master Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <div class="view-tabs">
+                        <button class="view-tab" id="view-folder"
+                            title="Folder View">
+                            <svg viewBox="0 0 24 24" width="18" height="18"
+                                fill="none" stroke="currentColor"
+                                stroke-width="2"><path
+                                    d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" /></svg>
+                        </button>
+                        <button class="view-tab active" id="view-list"
+                            title="Table View">
+                            <svg viewBox="0 0 24 24" width="18" height="18"
+                                fill="none" stroke="currentColor"
+                                stroke-width="2"><line x1="8" y1="6" x2="21"
+                                    y2="6"></line><line x1="8" y1="12" x2="21"
+                                    y2="12"></line><line x1="8" y1="18" x2="21"
+                                    y2="18"></line><line x1="3" y1="6" x2="3.01"
+                                    y2="6"></line><line x1="3" y1="12" x2="3.01"
+                                    y2="12"></line><line x1="3" y1="18"
+                                    x2="3.01" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    <div class="search-wrapper">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="search-input"
+                            class="search-input"
+                            placeholder="Search variables..." />
+                        <button id="btn-clear-search" class="btn-icon"
+                            style="display: none;">&times;</button>
+                    </div>
                 </div>
-                <div class="search-wrapper">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="search-input" class="search-input" placeholder="Search variables..." />
-                    <button id="btn-clear-search" class="btn-icon" style="display: none;">&times;</button>
+                <div class="toolbar-right">
+                    <button class="btn btn-secondary" id="btn-toggle-groups">↕️
+                        Expand/Collapse All</button>
+                    <button class="btn btn-secondary" id="btn-os-vars">⬆️ OS
+                        Variables</button>
+                    <button class="btn btn-secondary" id="btn-refresh">🔄
+                        Refresh</button>
+                    <button class="btn btn-secondary" id="btn-history">🕒
+                        History</button>
+                    <button class="btn btn-secondary" id="btn-import">📥
+                        Import</button>
+                    <div id="export-dropdown-container"></div>
+                    <button class="btn btn-primary" id="btn-add">➕ Add
+                        Variable</button>
                 </div>
             </div>
-            <div class="toolbar-right">
-                <button class="btn btn-secondary" id="btn-toggle-groups">↕️ Expand/Collapse All</button>
-                <button class="btn btn-secondary" id="btn-os-vars">⬆️ OS Variables</button>
-                <button class="btn btn-secondary" id="btn-refresh">🔄 Refresh</button>
-                <button class="btn btn-secondary" id="btn-history">🕒 History</button>
-                <button class="btn btn-secondary" id="btn-import">📥 Import</button>
-                <div id="export-dropdown-container"></div>
-                <button class="btn btn-primary" id="btn-add">➕ Add Variable</button>
-            </div>
-        </div>
 
-        <!-- Secondary Strip -->
-        <div class="toolbar-secondary">
-            <button class="btn btn-secondary btn-sm" id="btn-auto-group" title="Auto-detect and group variables by common prefixes (e.g. AUTH_*, SETTINGS_*, DB_*)">📦 Auto Group</button>
-            <button class="btn btn-secondary btn-sm" id="btn-ungroup" style="display: none;">🔗 Ungroup</button>
-            <button class="btn btn-secondary btn-sm" id="btn-auto-protect">🛡️ Auto Protect</button>
-            <button class="btn btn-secondary btn-sm" id="btn-clone-bulk" style="display: none;">👯 Clone Selected</button>
-            <button class="btn btn-danger btn-sm" id="btn-delete-bulk" style="display: none;">🗑️ Delete Selected <span id="delete-check-count"></span></button>
-            <button class="btn btn-secondary btn-sm" id="btn-group" style="display: none;">🔗 Group Selected <span id="master-check-count"></span></button>
-            <div style="flex: 1"></div>
-            <div id="admin-mode-container" style="display: none;">
-                <button class="btn btn-primary btn-sm" id="btn-admin-mode"><span id="admin-mode-text">Admin Mode</span></button>
-            </div>
-            <div class="stats" id="stats">
-                <span id="filtered-count">0</span> / <span id="total-vars">0</span> variables
-            </div>
-        </div>
-
-        <main class="main-content">
-            <div id="table-view-container" style="display: none;" class="table-container">
-                <table class="env-table">
-                    <thead>
-                        <tr>
-                            <th class="cell-check"><input type="checkbox" id="check-all" /></th>
-                            <th class="th-name sortable" id="header-name">Variable Name <span class="sort-icon">↕</span></th>
-                            <th class="th-value sortable" id="header-value">Value <span class="sort-icon">↕</span></th>
-                            <th class="th-protected sortable" id="header-protected">Protection <span class="sort-icon">↕</span></th>
-                            <th class="th-actions">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="env-table-body"></tbody>
-                </table>
+            <!-- Secondary Strip -->
+            <div class="toolbar-secondary">
+                <button class="btn btn-secondary btn-sm" id="btn-auto-group"
+                    title="Auto-detect and group variables by common prefixes (e.g. AUTH_*, SETTINGS_*, DB_*)">📦
+                    Auto Group</button>
+                <button class="btn btn-secondary btn-sm" id="btn-ungroup"
+                    style="display: none;">🔗 Ungroup</button>
+                <button class="btn btn-secondary btn-sm"
+                    id="btn-auto-protect">🛡️ Auto Protect</button>
+                <button class="btn btn-secondary btn-sm" id="btn-clone-bulk"
+                    style="display: none;">👯 Clone Selected</button>
+                <button class="btn btn-danger btn-sm" id="btn-delete-bulk"
+                    style="display: none;">🗑️ Delete Selected <span
+                        id="delete-check-count"></span></button>
+                <button class="btn btn-secondary btn-sm" id="btn-group"
+                    style="display: none;">🔗 Group Selected <span
+                        id="master-check-count"></span></button>
+                <div style="flex: 1"></div>
+                <div id="admin-mode-container" style="display: none;">
+                    <button class="btn btn-primary btn-sm"
+                        id="btn-admin-mode"><span id="admin-mode-text">Admin
+                            Mode</span></button>
+                </div>
+                <div class="stats" id="stats">
+                    <span id="filtered-count">0</span> / <span
+                        id="total-vars">0</span> variables
+                </div>
             </div>
 
-            <div id="folder-view-container" class="folder-view-container">
-                <aside class="explorer-sidebar" id="explorer-sidebar"></aside>
-                <div class="resizer" id="resizer-sidebar"></div>
-                <div class="explorer-main">
-                    <div class="explorer-navbar">
-                        <button class="btn-icon" id="explorer-back">⬅️</button>
-                        <button class="btn-icon" id="explorer-up">⬆️</button>
-                        <div id="explorer-breadcrumbs" class="explorer-breadcrumbs"></div>
-                        <div class="explorer-search-wrapper">
-                            <input type="text" id="explorer-filter" placeholder="Filter folder..." />
-                            <button id="btn-clear-explorer" class="btn-icon" style="display: none;">&times;</button>
+            <main class="main-content">
+                <div id="table-view-container" style="display: none;"
+                    class="table-container">
+                    <table class="env-table">
+                        <thead>
+                            <tr>
+                                <th class="cell-check"><input type="checkbox"
+                                        id="check-all" /></th>
+                                <th class="th-name sortable"
+                                    id="header-name">Variable Name <span
+                                        class="sort-icon">↕</span></th>
+                                <th class="th-value sortable"
+                                    id="header-value">Value <span
+                                        class="sort-icon">↕</span></th>
+                                <th class="th-protected sortable"
+                                    id="header-protected">Protection <span
+                                        class="sort-icon">↕</span></th>
+                                <th class="th-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="env-table-body"></tbody>
+                    </table>
+                </div>
+
+                <div id="folder-view-container" class="folder-view-container">
+                    <aside class="explorer-sidebar"
+                        id="explorer-sidebar"></aside>
+                    <div class="resizer" id="resizer-sidebar"></div>
+                    <div class="explorer-main">
+                        <div class="explorer-navbar">
+                            <button class="btn-icon"
+                                id="explorer-back">⬅️</button>
+                            <button class="btn-icon"
+                                id="explorer-up">⬆️</button>
+                            <div id="explorer-breadcrumbs"
+                                class="explorer-breadcrumbs"></div>
+                            <div class="explorer-search-wrapper">
+                                <input type="text" id="explorer-filter"
+                                    placeholder="Filter folder..." />
+                                <button id="btn-clear-explorer" class="btn-icon"
+                                    style="display: none;">&times;</button>
+                            </div>
+                            <button class="btn-icon"
+                                id="btn-folder-sort">📶</button>
+                            <div id="folder-sort-menu" class="dropdown-menu"
+                                style="display: none;">
+                                <div class="dropdown-item sort-option"
+                                    data-sort="name">Sort by Name</div>
+                                <div class="dropdown-item sort-option"
+                                    data-sort="value">Sort by Value</div>
+                                <div class="dropdown-item sort-option"
+                                    data-sort="protected">Sort by
+                                    Protection</div>
+                                <div class="menu-sep"></div>
+                                <div class="dropdown-item"
+                                    id="folder-sort-order">
+                                    <span id="sort-order-text">Sort:
+                                        Ascending</span>
+                                </div>
+                            </div>
                         </div>
-                        <button class="btn-icon" id="btn-folder-sort">📶</button>
-                        <div id="folder-sort-menu" class="dropdown-menu" style="display: none;">
-                            <div class="dropdown-item sort-option" data-sort="name">Sort by Name</div>
-                            <div class="dropdown-item sort-option" data-sort="value">Sort by Value</div>
-                            <div class="dropdown-item sort-option" data-sort="protected">Sort by Protection</div>
-                            <div class="menu-sep"></div>
-                            <div class="dropdown-item" id="folder-sort-order">
-                                <span id="sort-order-text">Sort: Ascending</span>
+                        <div class="explorer-content"
+                            id="explorer-content"></div>
+                        <div class="explorer-footer" id="explorer-status">0
+                            items</div>
+                    </div>
+                    <div class="resizer" id="resizer-details"></div>
+                    <div class="explorer-details" id="explorer-details">
+                        <div id="details-empty" class="details-empty">Select an
+                            item to view details</div>
+                        <div class="details-content" id="details-content"
+                            style="display: none;">
+                            <span class="details-icon"
+                                id="details-icon">📄</span><h2
+                                class="details-name" id="details-name"></h2>
+                            <div
+                                style="display: flex; gap: 8px; margin: 8px 0;">
+                                <span id="badge-type"
+                                    class="badge">Variable</span><span
+                                    id="badge-protected" class="badge"></span>
+                            </div>
+                            <div
+                                class="details-section"><label>Value</label><div
+                                    class="details-value-box"><code
+                                        id="details-value"></code></div></div>
+                            <div class="details-actions">
+                                <button id="btn-details-reveal"
+                                    class="btn btn-secondary btn-sm btn-reveal-modal"
+                                    title="Toggle visibility">
+                                    <svg viewBox="0 0 24 24" width="14"
+                                        height="14" fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"><path
+                                            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
+                                            cx="12" cy="12" r="3" /></svg>
+                                    REVEAL
+                                </button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-protect"
+                                    title="Toggle protection">🛡️
+                                    Protection</button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-copy">📋 Copy</button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-edit">✏️ Edit</button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-history">🕒 History</button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-clone">👯 Clone</button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-optimize">⚡
+                                    Optimize</button>
+                                <button class="btn btn-secondary btn-sm"
+                                    id="btn-details-open-path"
+                                    style="display: none;">📁 Open</button>
                             </div>
                         </div>
                     </div>
-                    <div class="explorer-content" id="explorer-content"></div>
-                    <div class="explorer-footer" id="explorer-status">0 items</div>
                 </div>
-                <div class="resizer" id="resizer-details"></div>
-                <div class="explorer-details" id="explorer-details">
-                    <div id="details-empty" class="details-empty">Select an item to view details</div>
-                    <div class="details-content" id="details-content" style="display: none;">
-                        <span class="details-icon" id="details-icon">📄</span><h2 class="details-name" id="details-name"></h2>
-                        <div style="display: flex; gap: 8px; margin: 8px 0;">
-                            <span id="badge-type" class="badge">Variable</span><span id="badge-protected" class="badge"></span>
+            </main>
+        </div>
+
+        <!-- Modals -->
+        <div id="modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header"><h2 id="modal-title">Edit</h2><button
+                        id="modal-close"
+                        class="close-btn">&times;</button></div>
+                <div class="modal-body">
+                    <div class="form-group"><label>Name</label><input
+                            type="text" id="var-name-input"
+                            class="form-input" /></div>
+                    <div class="form-group">
+                        <label>Value</label>
+                        <div class="modal-value-container">
+                            <textarea id="var-value-input"
+                                class="form-input"></textarea>
+                            <div id="var-value-mask" class="var-value-mask"
+                                style="display: none;"><span>Hidden</span></div>
+                            <div id="modal-multi-value-container"
+                                style="display: none; flex-direction: column; gap: 4px;"></div>
                         </div>
-                        <div class="details-section"><label>Value</label><div class="details-value-box"><code id="details-value"></code></div></div>
-                        <div class="details-actions">
-                            <button id="btn-details-reveal" class="btn btn-secondary btn-sm btn-reveal-modal" title="Toggle visibility">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                REVEAL
-                            </button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-protect" title="Toggle protection">🛡️ Protection</button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-copy">📋 Copy</button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-edit">✏️ Edit</button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-history">🕒 History</button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-clone">👯 Clone</button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-optimize">⚡ Optimize</button>
-                            <button class="btn btn-secondary btn-sm" id="btn-details-open-path" style="display: none;">📁 Open</button>
-                        </div>
+                        <button id="btn-modal-reveal" class="btn-text"
+                            style="display: none;">👁️ Reveal</button>
                     </div>
+                    <div class="form-group"><input type="checkbox"
+                            id="var-protected-input" />
+                        <label>Protected</label></div>
                 </div>
+                <div class="modal-footer"><button id="modal-cancel"
+                        class="btn btn-secondary">Cancel</button><button
+                        id="modal-save"
+                        class="btn btn-primary">Save</button></div>
             </div>
-        </main>
-    </div>
+        </div>
 
-    <!-- Modals -->
-    <div id="modal-overlay" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header"><h2 id="modal-title">Edit</h2><button id="modal-close" class="close-btn">&times;</button></div>
-            <div class="modal-body">
-                <div class="form-group"><label>Name</label><input type="text" id="var-name-input" class="form-input" /></div>
-                <div class="form-group">
-                    <label>Value</label>
-                    <div class="modal-value-container">
-                        <textarea id="var-value-input" class="form-input"></textarea>
-                        <div id="var-value-mask" class="var-value-mask" style="display: none;"><span>Hidden</span></div>
-                        <div id="modal-multi-value-container" style="display: none; flex-direction: column; gap: 4px;"></div>
+        <div id="confirm-overlay" class="modal-overlay" style="z-index: 9000;">
+            <div class="modal modal-sm">
+                <div class="modal-body"><p id="confirm-message"></p></div>
+                <div class="modal-footer"><button id="confirm-cancel"
+                        class="btn btn-secondary">Cancel</button><button
+                        id="confirm-action"
+                        class="btn btn-danger">Confirm</button></div>
+            </div>
+        </div>
+
+        <div id="group-modal-overlay" class="modal-overlay">
+            <div class="modal modal-sm">
+                <div class="modal-header"><h2>Create Group</h2><button
+                        id="group-modal-close"
+                        class="close-btn">&times;</button></div>
+                <div class="modal-body">
+                    <div
+                        style="margin-bottom: 12px; font-size: 12px; color: var(--text-secondary);">
+                        Grouping <strong id="group-modal-count"
+                            style="color: var(--accent-primary);">0</strong>
+                        variables into a new group:
                     </div>
-                    <button id="btn-modal-reveal" class="btn-text" style="display: none;">👁️ Reveal</button>
+                    <div class="form-group"><label>Group Name</label><input
+                            type="text" id="group-name-input" class="form-input"
+                            placeholder="e.g. My Database" /></div>
                 </div>
-                <div class="form-group"><input type="checkbox" id="var-protected-input" /> <label>Protected</label></div>
+                <div class="modal-footer"><button id="group-modal-cancel"
+                        class="btn btn-secondary">Cancel</button><button
+                        id="group-modal-save"
+                        class="btn btn-primary">Save</button></div>
             </div>
-            <div class="modal-footer"><button id="modal-cancel" class="btn btn-secondary">Cancel</button><button id="modal-save" class="btn btn-primary">Save</button></div>
         </div>
-    </div>
 
-    <div id="confirm-overlay" class="modal-overlay" style="z-index: 9000;">
-        <div class="modal modal-sm">
-            <div class="modal-body"><p id="confirm-message"></p></div>
-            <div class="modal-footer"><button id="confirm-cancel" class="btn btn-secondary">Cancel</button><button id="confirm-action" class="btn btn-danger">Confirm</button></div>
-        </div>
-    </div>
-
-    <div id="group-modal-overlay" class="modal-overlay">
-        <div class="modal modal-sm">
-            <div class="modal-header"><h2>Create Group</h2><button id="group-modal-close" class="close-btn">&times;</button></div>
-            <div class="modal-body">
-                <div style="margin-bottom: 12px; font-size: 12px; color: var(--text-secondary);">
-                    Grouping <strong id="group-modal-count" style="color: var(--accent-primary);">0</strong> variables into a new group:
+        <div id="history-overlay" class="modal-overlay">
+            <div class="modal modal-lg">
+                <div class="modal-header"><h2
+                        id="history-modal-title">History</h2><button
+                        id="history-modal-close"
+                        class="close-btn">&times;</button> <button
+                        id="history-close"
+                        style="display: none;"></button></div>
+                <div
+                    style="padding: 10px 20px; display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="history-search" class="form-input"
+                        style="flex: 1;" placeholder="Search logs..." />
+                    <select id="history-op-filter" class="form-input"
+                        style="width: 100px;"><option value>All</option><option
+                            value="CREATE">Add</option><option
+                            value="UPDATE">Update</option><option
+                            value="DELETE">Del</option><option
+                            value="OPTIMIZE">Opt</option></select>
+                    <input type="date" id="history-day-input" class="form-input"
+                        style="width: 150px;"
+                        title="Select a day to delete all logs" />
+                    <button id="btn-history-delete-day-top"
+                        class="btn btn-danger btn-sm">Delete Day</button>
+                    <div id="btn-history-delete-bulk"
+                        style="display: none;"><button
+                            class="btn btn-danger btn-sm">Delete <span
+                                id="history-selection-count"></span></button></div>
                 </div>
-                <div class="form-group"><label>Group Name</label><input type="text" id="group-name-input" class="form-input" placeholder="e.g. My Database" /></div>
-            </div>
-            <div class="modal-footer"><button id="group-modal-cancel" class="btn btn-secondary">Cancel</button><button id="group-modal-save" class="btn btn-primary">Save</button></div>
-        </div>
-    </div>
-
-    <div id="history-overlay" class="modal-overlay">
-        <div class="modal modal-lg">
-            <div class="modal-header"><h2 id="history-modal-title">History</h2><button id="history-modal-close" class="close-btn">&times;</button> <button id="history-close" style="display: none;"></button></div>
-            <div style="padding: 10px 20px; display: flex; gap: 8px; align-items: center;">
-                <input type="text" id="history-search" class="form-input" style="flex: 1;" placeholder="Search logs..." />
-                <select id="history-op-filter" class="form-input" style="width: 100px;"><option value="">All</option><option value="CREATE">Add</option><option value="UPDATE">Update</option><option value="DELETE">Del</option><option value="OPTIMIZE">Opt</option></select>
-                <div id="btn-history-delete-bulk" style="display: none;"><button class="btn btn-danger btn-sm">Delete <span id="history-selection-count"></span></button></div>
-            </div>
-            <div class="modal-body" style="padding: 0;">
-                <div class="history-grid-header" style="display:grid; grid-template-columns: 40px 60px 140px 130px 1fr 100px; gap:12px; padding:12px 24px; border-bottom:1px solid var(--border-default); background:var(--bg-tertiary); font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; align-items:center;">
-                    <input type="checkbox" id="history-select-all" />
-                    <span>Op</span>
-                    <span>Variable Name</span>
-                    <span>Timestamp</span>
-                    <span>Recent Changes</span>
-                    <span style="text-align:right;">Actions</span>
+                <div class="modal-body" style="padding: 0;">
+                    <div class="history-grid-header"
+                        style="display:grid; grid-template-columns: 40px 60px 140px 130px 1fr 100px; gap:12px; padding:12px 24px; border-bottom:1px solid var(--border-default); background:var(--bg-tertiary); font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; align-items:center;">
+                        <input type="checkbox" id="history-select-all" />
+                        <span>Op</span>
+                        <span>Variable Name</span>
+                        <span>Timestamp</span>
+                        <span>Recent Changes</span>
+                        <span style="text-align:right;">Actions</span>
+                    </div>
+                    <div id="history-list"></div>
                 </div>
-                <div id="history-list"></div>
+                <div class="modal-footer"><button id="history-modal-cancel"
+                        class="btn btn-secondary">Close</button> <button
+                        id="history-cancel"
+                        style="display: none;"></button></div>
             </div>
-            <div class="modal-footer"><button id="history-modal-cancel" class="btn btn-secondary">Close</button> <button id="history-cancel" style="display: none;"></button></div>
         </div>
-    </div>
 
-    <div id="import-modal-overlay" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Import</h2>
-                <div style="display: flex; gap: 8px; margin-left: auto; margin-right: 12px;">
-                    <button id="btn-import-info" class="btn-icon" title="Import Help" style="background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; color: var(--accent-primary); transition: all 0.2s;">ℹ️</button>
+        <div id="import-modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Import</h2>
+                    <div
+                        style="display: flex; gap: 8px; margin-left: auto; margin-right: 12px;">
+                        <button id="btn-import-info" class="btn-icon"
+                            title="Import Help"
+                            style="background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; color: var(--accent-primary); transition: all 0.2s;">ℹ️</button>
+                    </div>
+                    <button id="import-modal-close"
+                        class="close-btn">&times;</button>
                 </div>
-                <button id="import-modal-close" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div style="position: relative;">
-                    <textarea id="import-text-input" class="form-input" style="height: 100px;" placeholder="Paste JSON or KEY=VALUE lines..."></textarea>
-                    <button id="btn-import-reveal" class="btn btn-sm" style="display: none; position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.5);">
-                        <span id="import-reveal-icon">👁️</span> <span id="import-reveal-label">Reveal</span>
-                    </button>
+                <div class="modal-body">
+                    <div style="position: relative;">
+                        <textarea id="import-text-input" class="form-input"
+                            style="height: 100px;"
+                            placeholder="Paste JSON or KEY=VALUE lines..."></textarea>
+                        <button id="btn-import-reveal" class="btn btn-sm"
+                            style="display: none; position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.5);">
+                            <span id="import-reveal-icon">👁️</span> <span
+                                id="import-reveal-label">Reveal</span>
+                        </button>
+                    </div>
+                    <div
+                        style="margin: 10px 0; text-align: center; color: var(--text-muted);">—
+                        OR —</div>
+                    <button id="btn-import-file" class="btn btn-secondary"
+                        style="width: 100%;">📂 Open File</button>
                 </div>
-                <div style="margin: 10px 0; text-align: center; color: var(--text-muted);">— OR —</div>
-                <button id="btn-import-file" class="btn btn-secondary" style="width: 100%;">📂 Open File</button>
+                <div class="modal-footer"><button id="import-modal-cancel"
+                        class="btn btn-secondary">Cancel</button><button
+                        id="import-modal-save"
+                        class="btn btn-primary">Import</button></div>
             </div>
-            <div class="modal-footer"><button id="import-modal-cancel" class="btn btn-secondary">Cancel</button><button id="import-modal-save" class="btn btn-primary">Import</button></div>
         </div>
-    </div>
 
-    <!-- Import Help Modal -->
-    <div id="import-help-overlay" class="modal-overlay" style="z-index: 10001;">
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2>Import Documentation</h2>
-                <button id="import-help-close" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
-                <p style="margin-bottom: 12px;">You can import variables in two main formats:</p>
-                
-                <h3 style="color: var(--accent-primary); font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">1. KEY=VALUE (Standard)</h3>
-                <pre style="background: var(--bg-tertiary); padding: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); margin-bottom: 12px;">
+        <!-- Import Help Modal -->
+        <div id="import-help-overlay" class="modal-overlay"
+            style="z-index: 10001;">
+            <div class="modal" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Import Documentation</h2>
+                    <button id="import-help-close"
+                        class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body"
+                    style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
+                    <p style="margin-bottom: 12px;">You can import variables in
+                        two main formats:</p>
+
+                    <h3
+                        style="color: var(--accent-primary); font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">1.
+                        KEY=VALUE (Standard)</h3>
+                    <pre
+                        style="background: var(--bg-tertiary); padding: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); margin-bottom: 12px;">
 # Comments are ignored
 DB_HOST=localhost
 API_KEY="secret-token"
 PORT=3000</pre>
 
-                <h3 style="color: var(--accent-primary); font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">2. JSON (Array or Object)</h3>
-                <pre style="background: var(--bg-tertiary); padding: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); margin-bottom: 12px;">
+                    <h3
+                        style="color: var(--accent-primary); font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">2.
+                        JSON (Array or Object)</h3>
+                    <pre
+                        style="background: var(--bg-tertiary); padding: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); margin-bottom: 12px;">
 // Nested objects are auto-flattened
 {
   "API": {
@@ -299,276 +473,431 @@ PORT=3000</pre>
 }
 // Becomes: API__BASE_URL and API__RETRY_COUNT</pre>
 
-                <h3 style="color: var(--accent-primary); font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">3. File Import (.json, .env, .txt)</h3>
-                <ul style="padding-left: 16px; margin-bottom: 12px;">
-                    <li style="margin-bottom: 4px;"><strong>.json</strong>: Parsed as structured data (auto-flattened).</li>
-                    <li style="margin-bottom: 4px;"><strong>.env / .txt</strong>: Parsed line by line (ignores comment lines).</li>
-                </ul>
+                    <h3
+                        style="color: var(--accent-primary); font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">3.
+                        File Import (.json, .env, .txt)</h3>
+                    <ul style="padding-left: 16px; margin-bottom: 12px;">
+                        <li style="margin-bottom: 4px;"><strong>.json</strong>:
+                            Parsed as structured data (auto-flattened).</li>
+                        <li style="margin-bottom: 4px;"><strong>.env /
+                                .txt</strong>: Parsed line by line (ignores
+                            comment lines).</li>
+                    </ul>
 
-                <p style="font-style: italic; font-size: 11px;">Protected variables will be automatically detected based on sensitive keywords (Key, Secret, Token, etc.).</p>
-            </div>
-            <div class="modal-footer">
-                <button id="import-help-ok" class="btn btn-primary">Got it!</button>
+                    <p style="font-style: italic; font-size: 11px;">Protected
+                        variables will be automatically detected based on
+                        sensitive keywords (Key, Secret, Token, etc.).</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="import-help-ok" class="btn btn-primary">Got
+                        it!</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div id="view-value-overlay" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header"><h2 id="view-value-title">View</h2><button id="view-value-close" class="close-btn">&times;</button></div>
-            <div class="modal-body">
-                <label id="view-value-name-label"></label>
-                <textarea id="view-value-content" class="form-input" readonly style="height: 200px; margin-top: 8px;"></textarea>
-                <div id="view-value-grid-container" style="display: none; flex-direction: column; gap: 8px;"><div id="view-value-grid"></div></div>
-            </div>
-            <div class="modal-footer"><button id="view-value-copy" class="btn btn-primary">Copy</button><button id="view-value-cancel" class="btn btn-secondary">Close</button></div>
-        </div>
-    </div>
-
-    <div id="os-vars-overlay" class="modal-overlay">
-        <div class="modal modal-lg">
-            <div class="modal-header">
-                <h2>System Environment Variables</h2>
-                <div class="os-vars-toolbar" style="display: flex; gap: 8px; align-items: center; margin-left: auto; margin-right: 12px;">
-                    <div id="os-vars-export-dropdown-container"></div>
+        <div id="view-value-overlay" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header"><h2
+                        id="view-value-title">View</h2><button
+                        id="view-value-close"
+                        class="close-btn">&times;</button></div>
+                <div class="modal-body">
+                    <label id="view-value-name-label"></label>
+                    <textarea id="view-value-content" class="form-input"
+                        readonly
+                        style="height: 200px; margin-top: 8px;"></textarea>
+                    <div id="view-value-grid-container"
+                        style="display: none; flex-direction: column; gap: 8px;"><div
+                            id="view-value-grid"></div></div>
                 </div>
-                <button id="os-vars-close" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body" style="padding: 0;">
-                <div id="os-vars-header" style="padding: 10px 20px; border-bottom: 1px solid var(--border-default); background: var(--bg-tertiary); display: flex; align-items: center; gap: 12px;">
-                    <input type="checkbox" id="os-vars-check-all" />
-                    <span style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Select All</span>
-                    <div style="flex: 1"></div>
-                    <div id="os-vars-selection-stats" style="font-size: 11px; color: var(--text-muted); display: none;">
-                        <span id="os-vars-selected-count">0</span> selected
-                    </div>
-                </div>
-                <div id="os-vars-list"></div>
-            </div>
-            <div class="modal-footer">
-                <button id="os-vars-cancel" class="btn btn-secondary">Close</button>
+                <div class="modal-footer"><button id="view-value-copy"
+                        class="btn btn-primary">Copy</button><button
+                        id="view-value-cancel"
+                        class="btn btn-secondary">Close</button></div>
             </div>
         </div>
-    </div>
 
-    <!-- Import Review Modal -->
-    <div id="import-review-modal-overlay" class="modal-overlay">
-        <div class="modal modal-lg">
-            <div class="modal-header">
-                <h2>Import Review</h2>
-                <button id="import-review-modal-close" class="close-btn">&times;</button>
+        <div id="os-vars-overlay" class="modal-overlay">
+            <div class="modal modal-lg">
+                <div class="modal-header">
+                    <h2>System Environment Variables</h2>
+                    <div class="os-vars-toolbar"
+                        style="display: flex; gap: 8px; align-items: center; margin-left: auto; margin-right: 12px;">
+                        <div id="os-vars-export-dropdown-container"></div>
+                    </div>
+                    <button id="os-vars-close"
+                        class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 0;">
+                    <div id="os-vars-header"
+                        style="padding: 10px 20px; border-bottom: 1px solid var(--border-default); background: var(--bg-tertiary); display: flex; align-items: center; gap: 12px;">
+                        <input type="checkbox" id="os-vars-check-all" />
+                        <span
+                            style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Select
+                            All</span>
+                        <div style="flex: 1"></div>
+                        <div id="os-vars-selection-stats"
+                            style="font-size: 11px; color: var(--text-muted); display: none;">
+                            <span id="os-vars-selected-count">0</span> selected
+                        </div>
+                    </div>
+                    <div id="os-vars-list"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="os-vars-cancel"
+                        class="btn btn-secondary">Close</button>
+                </div>
             </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 20px; padding: 12px; background: rgba(var(--accent-rgb), 0.1); border-radius: 8px; font-size: 13px;">
-                    We found <strong id="import-review-new-count">0</strong> new variables and <strong id="import-review-existing-count">0</strong> variables that will be updated.
-                </div>
+        </div>
 
-                <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Variable Prefix (Optional)</label>
-                        <input type="text" id="import-prefix-input" placeholder="e.g. MY_APP" style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
-                    </div>
-                    <div style="width: 80px;">
-                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Separator</label>
-                        <input type="text" id="import-separator-input" value="__" placeholder="__" style="width: 100%; height: 32px; font-size: 12px; text-align: center; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 15px;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="import-group-by-prefix" style="width: 16px; height: 16px;">
-                            <label for="import-group-by-prefix" style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Group by Prefix</label>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="import-delete-originals" style="width: 16px; height: 16px;">
-                            <label for="import-delete-originals" style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Delete originals (Move)</label>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="import-replace-separators" style="width: 16px; height: 16px;">
-                            <label for="import-replace-separators" style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Replace all separators in name</label>
-                        </div>
-                    </div>
+        <!-- Import Review Modal -->
+        <div id="import-review-modal-overlay" class="modal-overlay">
+            <div class="modal modal-lg">
+                <div class="modal-header">
+                    <h2>Import Review</h2>
+                    <button id="import-review-modal-close"
+                        class="close-btn">&times;</button>
                 </div>
-                
-                <div class="review-sections" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                    <div class="review-section">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <h3 style="font-size: 12px; margin: 0; color: var(--accent-primary);">ADD NEW</h3>
-                            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
-                                <input type="checkbox" id="import-new-select-all" checked>
-                                <label for="import-new-select-all">All</label>
+                <div class="modal-body">
+                    <div
+                        style="margin-bottom: 20px; padding: 12px; background: rgba(var(--accent-rgb), 0.1); border-radius: 8px; font-size: 13px;">
+                        We found <strong id="import-review-new-count">0</strong>
+                        new variables and <strong
+                            id="import-review-existing-count">0</strong>
+                        variables that will be updated.
+                    </div>
+
+                    <div
+                        style="margin-bottom: 20px; display: flex; align-items: center; gap: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                        <div style="flex: 1;">
+                            <label
+                                style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Variable
+                                Prefix (Optional)</label>
+                            <input type="text" id="import-prefix-input"
+                                placeholder="e.g. MY_APP"
+                                style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                        </div>
+                        <div style="width: 80px;">
+                            <label
+                                style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Separator</label>
+                            <input type="text" id="import-separator-input"
+                                value="__" placeholder="__"
+                                style="width: 100%; height: 32px; font-size: 12px; text-align: center; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                        </div>
+                        <div
+                            style="display: flex; flex-direction: column; gap: 8px; padding-top: 15px;">
+                            <div
+                                style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox"
+                                    id="import-group-by-prefix"
+                                    style="width: 16px; height: 16px;">
+                                <label for="import-group-by-prefix"
+                                    style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Group
+                                    by Prefix</label>
+                            </div>
+                            <div
+                                style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox"
+                                    id="import-delete-originals"
+                                    style="width: 16px; height: 16px;">
+                                <label for="import-delete-originals"
+                                    style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Delete
+                                    originals (Move)</label>
+                            </div>
+                            <div
+                                style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox"
+                                    id="import-replace-separators"
+                                    style="width: 16px; height: 16px;">
+                                <label for="import-replace-separators"
+                                    style="font-size: 12px; color: var(--text-primary); cursor: pointer;">Replace
+                                    all separators in name</label>
                             </div>
                         </div>
-                        <div id="import-review-new-list" class="review-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: 4px; padding: 8px;"></div>
-                        <div id="import-review-no-new" style="display: none; padding: 20px; text-align: center; font-size: 12px; color: var(--text-muted);">No new variables</div>
                     </div>
-                    <div class="review-section">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <h3 style="font-size: 12px; margin: 0; color: var(--warning);">OVERWRITE EXISTING</h3>
-                            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
-                                <input type="checkbox" id="import-existing-select-all" checked>
-                                <label for="import-existing-select-all">All</label>
+
+                    <div class="review-sections"
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div class="review-section">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h3
+                                    style="font-size: 12px; margin: 0; color: var(--accent-primary);">ADD
+                                    NEW</h3>
+                                <div
+                                    style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
+                                    <input type="checkbox"
+                                        id="import-new-select-all" checked>
+                                    <label
+                                        for="import-new-select-all">All</label>
+                                </div>
                             </div>
+                            <div id="import-review-new-list" class="review-list"
+                                style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: 4px; padding: 8px;"></div>
+                            <div id="import-review-no-new"
+                                style="display: none; padding: 20px; text-align: center; font-size: 12px; color: var(--text-muted);">No
+                                new variables</div>
                         </div>
-                        <div id="import-review-existing-list" class="review-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: 4px; padding: 8px;"></div>
-                        <div id="import-review-no-existing" style="display: none; padding: 20px; text-align: center; font-size: 12px; color: var(--text-muted);">No overwrites</div>
+                        <div class="review-section">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h3
+                                    style="font-size: 12px; margin: 0; color: var(--warning);">OVERWRITE
+                                    EXISTING</h3>
+                                <div
+                                    style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
+                                    <input type="checkbox"
+                                        id="import-existing-select-all" checked>
+                                    <label
+                                        for="import-existing-select-all">All</label>
+                                </div>
+                            </div>
+                            <div id="import-review-existing-list"
+                                class="review-list"
+                                style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: 4px; padding: 8px;"></div>
+                            <div id="import-review-no-existing"
+                                style="display: none; padding: 20px; text-align: center; font-size: 12px; color: var(--text-muted);">No
+                                overwrites</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <button id="btn-import-review-reveal"
+                            class="btn-text">👁️ Reveal Values</button>
                     </div>
                 </div>
-                <div style="margin-top: 16px;">
-                    <button id="btn-import-review-reveal" class="btn-text">👁️ Reveal Values</button>
+                <div class="modal-footer">
+                    <button id="import-review-cancel"
+                        class="btn btn-secondary">Cancel</button>
+                    <button id="import-review-confirm"
+                        class="btn btn-primary">Confirm & Save</button>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button id="import-review-cancel" class="btn btn-secondary">Cancel</button>
-                <button id="import-review-confirm" class="btn btn-primary">Confirm & Save</button>
             </div>
         </div>
-    </div>
 
-    <div id="optimize-overlay" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header"><h2>Optimization Preview</h2><button id="optimize-close" class="close-btn">&times;</button></div>
-            <div class="modal-body">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>Old (<span id="optimize-original-count">0</span>):<pre id="optimize-original"></pre></div>
-                    <div>New (<span id="optimize-new-count">0</span>):<pre id="optimize-new"></pre></div>
+        <div id="optimize-overlay" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header"><h2>Optimization Preview</h2><button
+                        id="optimize-close"
+                        class="close-btn">&times;</button></div>
+                <div class="modal-body">
+                    <div
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>Old (<span
+                                id="optimize-original-count">0</span>):<pre
+                                id="optimize-original"></pre></div>
+                        <div>New (<span id="optimize-new-count">0</span>):<pre
+                                id="optimize-new"></pre></div>
+                    </div>
+                    <div style="margin-top: 10px;">Saved: <span
+                            id="optimize-reduction-value">0</span> (<span
+                            id="optimize-reduction-percent">0</span>%)</div>
                 </div>
-                <div style="margin-top: 10px;">Saved: <span id="optimize-reduction-value">0</span> (<span id="optimize-reduction-percent">0</span>%)</div>
-            </div>
-            <div class="modal-footer"><button id="optimize-cancel" class="btn btn-secondary">Cancel</button><button id="optimize-apply" class="btn btn-primary">Apply</button></div>
-        </div>
-    </div>
-    <!-- Script Export Modal -->
-    <div id="script-export-overlay" class="modal-overlay">
-        <div class="modal" style="max-width: 1000px; width: 95%;">
-            <div class="modal-header">
-                <h2>Export as Script</h2>
-                <button id="script-export-close" class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary);">Select the script format for exporting your variables:</p>
-                
-                <div class="export-options-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
-                    <div class="export-mode-btn active" data-mode="standard">
-                        <div class="mode-icon">📜</div>
-                        <div class="mode-title">Standard Shell</div>
-                        <div class="mode-desc">set / export</div>
-                    </div>
-                    <div class="export-mode-btn" data-mode="aws">
-                        <div class="mode-icon">☁️</div>
-                        <div class="mode-title">AWS CLI</div>
-                        <div class="mode-desc">export AWS_*</div>
-                    </div>
-                    <div class="export-mode-btn" data-mode="azure">
-                        <div class="mode-icon">🟦</div>
-                        <div class="mode-title">Azure CLI</div>
-                        <div class="mode-desc">az configure</div>
-                    </div>
-                    <div class="export-mode-btn" data-mode="terraform">
-                        <div class="mode-icon">🔨</div>
-                        <div class="mode-title">Terraform</div>
-                        <div class="mode-desc">TF_VAR_name</div>
-                    </div>
-                    <div class="export-mode-btn" data-mode="github">
-                        <div class="mode-icon">🐙</div>
-                        <div class="mode-title">GitHub CLI</div>
-                        <div class="mode-desc">gh secret set</div>
-                    </div>
-                    <div class="export-mode-btn" data-mode="appsettings">
-                        <div class="mode-icon">⚙️</div>
-                        <div class="mode-title">App Settings</div>
-                        <div class="mode-desc">appsettings.{env}.json</div>
-                    </div>
-                </div>
-                
-                <div id="os-selection-container" style="margin-top: 15px; display: grid; grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr); gap: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
-                    <div>
-                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Target OS</label>
-                        <select id="export-os-select" class="form-input" style="width: 100%; height: 36px; font-size: 13px; padding: 0 12px;">
-                            <option value="windows">🪟 Windows</option>
-                            <option value="linux">🐧 Linux / macOS</option>
-                        </select>
-                    </div>
-                    <div id="windows-cmd-container">
-                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Command Type</label>
-                        <select id="export-windows-cmd" class="form-input" style="width: 100%; height: 36px; font-size: 13px; padding: 0 12px;">
-                            <option value="set">set (Current Session)</option>
-                            <option value="setx">setx (Persistent)</option>
-                            <option value="powershell">PowerShell (Persistent)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 6px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="export-mask-protected" style="width: 14px; height: 14px;">
-                        <label for="export-mask-protected" style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Mask Protected Variables (export with ********)</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="export-mask-blank" style="width: 14px; height: 14px;">
-                        <label for="export-mask-blank" style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Mask Protected Variables with Empty String</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="export-exclude-protected" style="width: 14px; height: 14px;">
-                        <label for="export-exclude-protected" style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Exclude Protected Variables from Export</label>
-                    </div>
-                </div>
-                
-                <div id="github-options-container" style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
-                    <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Optional: Target Repository</label>
-                    <input type="text" id="github-repo-input" placeholder="owner/repo" style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
-                </div>
-
-                <div id="appsettings-options-container" style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Environment (optional)</label>
-                        <input type="text" id="appsettings-env-input" list="env-datalist" placeholder="e.g. Development" style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
-                        <datalist id="env-datalist"></datalist>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="appsettings-include-prefix" checked style="width: 14px; height: 14px;">
-                        <label for="appsettings-include-prefix" style="font-size: 12px; color: var(--text-secondary); cursor: pointer;">Include full variable name (Suppress prefix if unchecked)</label>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 11px; border: 1px solid var(--border-default);">
-                    <strong>Preview:</strong>
-                    <pre id="script-export-preview" style="margin-top: 8px; color: var(--accent-primary); max-height: 150px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px;"></pre>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="script-export-cancel" class="btn btn-secondary">Cancel</button>
-                <div style="flex: 1;"></div>
-                <button id="export-action-browser" class="btn btn-secondary" style="color: var(--accent-primary);">Show in Browser</button>
-                <button id="export-action-editor" class="btn btn-secondary" style="color: var(--accent-primary);">Open in Editor</button>
-                <button id="script-export-save" class="btn btn-primary">Save to File</button>
+                <div class="modal-footer"><button id="optimize-cancel"
+                        class="btn btn-secondary">Cancel</button><button
+                        id="optimize-apply"
+                        class="btn btn-primary">Apply</button></div>
             </div>
         </div>
-    </div>
+        <!-- Script Export Modal -->
+        <div id="script-export-overlay" class="modal-overlay">
+            <div class="modal" style="max-width: 1000px; width: 95%;">
+                <div class="modal-header">
+                    <h2>Export as Script</h2>
+                    <button id="script-export-close"
+                        class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p
+                        style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary);">Select
+                        the script format for exporting your variables:</p>
 
-    <div id="btn-delete-selected" style="display: none;"></div>
+                    <div class="export-options-grid"
+                        style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                        <div class="export-mode-btn active"
+                            data-mode="standard">
+                            <div class="mode-icon">📜</div>
+                            <div class="mode-title">Standard Shell</div>
+                            <div class="mode-desc">set / export</div>
+                        </div>
+                        <div class="export-mode-btn" data-mode="aws">
+                            <div class="mode-icon">☁️</div>
+                            <div class="mode-title">AWS CLI</div>
+                            <div class="mode-desc">export AWS_*</div>
+                        </div>
+                        <div class="export-mode-btn" data-mode="azure">
+                            <div class="mode-icon">🟦</div>
+                            <div class="mode-title">Azure CLI</div>
+                            <div class="mode-desc">az configure</div>
+                        </div>
+                        <div class="export-mode-btn" data-mode="terraform">
+                            <div class="mode-icon">🔨</div>
+                            <div class="mode-title">Terraform</div>
+                            <div class="mode-desc">TF_VAR_name</div>
+                        </div>
+                        <div class="export-mode-btn" data-mode="github">
+                            <div class="mode-icon">🐙</div>
+                            <div class="mode-title">GitHub CLI</div>
+                            <div class="mode-desc">gh secret set</div>
+                        </div>
+                        <div class="export-mode-btn" data-mode="appsettings">
+                            <div class="mode-icon">⚙️</div>
+                            <div class="mode-title">App Settings</div>
+                            <div class="mode-desc">appsettings.{env}.json</div>
+                        </div>
+                    </div>
 
-    <!-- Context Menu -->
-    <div id="context-menu" class="context-menu" style="display: none;">
-        <div class="menu-item var-action" id="menu-view">👁️ View</div>
-        <div class="menu-item var-action" id="menu-edit">✏️ Edit</div>
-        <div class="menu-item var-action" id="menu-copy">📋 Copy</div>
-        <div class="menu-item var-action" id="menu-clone">👯 Clone Selected</div>
-        <div class="menu-item var-action" id="menu-copy-to-group">📦 Copy to Group...</div>
-        <div class="menu-item var-action" id="menu-move-to-group">➡️ Move to Group...</div>
-        <div class="menu-item var-action" id="menu-protect">🛡️ <span id="menu-protect-text">Protect</span></div>
-        <div class="menu-item var-action" id="menu-history">🕒 History</div>
-        <div class="menu-item var-action" id="menu-optimize">⚡ Optimize</div>
-        <div class="menu-item var-action" id="menu-open-path">📁 Show in Folder</div>
-        <div class="menu-item folder-action" id="menu-folder-open">📂 Open</div>
-        <div class="menu-item folder-action" id="menu-folder-add">➕ Add Variable Here</div>
-        <div class="menu-item folder-action" id="menu-folder-protect">🛡️ <span id="menu-folder-protect-text">Protect All Inside</span></div>
-        <div class="menu-item folder-action" id="menu-folder-rename">✏️ Rename Group...</div>
-        <div class="menu-item folder-action" id="menu-folder-autoprotect">📦 Auto Protect Folder</div>
-        <div class="menu-item folder-action" id="menu-folder-ungroup" style="display: none;">🔗 Ungroup Group</div>
-        <div class="menu-item general-action" id="menu-general-add">➕ Add Variable Here</div>
-        <div class="menu-sep"></div>
-        <div class="menu-item menu-danger" id="menu-delete">🗑️ Delete</div>
-    </div>
+                    <div id="os-selection-container"
+                        style="margin-top: 15px; display: grid; grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr); gap: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                        <div>
+                            <label
+                                style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Target
+                                OS</label>
+                            <select id="export-os-select" class="form-input"
+                                style="width: 100%; height: 36px; font-size: 13px; padding: 0 12px;">
+                                <option value="windows">🪟 Windows</option>
+                                <option value="linux">🐧 Linux / macOS</option>
+                            </select>
+                        </div>
+                        <div id="windows-cmd-container">
+                            <label
+                                style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Command
+                                Type</label>
+                            <select id="export-windows-cmd" class="form-input"
+                                style="width: 100%; height: 36px; font-size: 13px; padding: 0 12px;">
+                                <option value="set">set (Current
+                                    Session)</option>
+                                <option value="setx">setx (Persistent)</option>
+                                <option value="powershell">PowerShell
+                                    (Persistent)</option>
+                            </select>
+                        </div>
+                    </div>
 
-    <script type="module" src="renderer.js"></script>
-</body>
+                    <div
+                        style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 6px;">
+                        <div
+                            style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="export-mask-protected"
+                                style="width: 14px; height: 14px;">
+                            <label for="export-mask-protected"
+                                style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Mask
+                                Protected Variables (export with
+                                ********)</label>
+                        </div>
+                        <div
+                            style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="export-mask-blank"
+                                style="width: 14px; height: 14px;">
+                            <label for="export-mask-blank"
+                                style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Mask
+                                Protected Variables with Empty String</label>
+                        </div>
+                        <div
+                            style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="export-exclude-protected"
+                                style="width: 14px; height: 14px;">
+                            <label for="export-exclude-protected"
+                                style="font-size: 12px; color: var(--text-primary); cursor: pointer; font-weight: 500;">Exclude
+                                Protected Variables from Export</label>
+                        </div>
+                    </div>
+
+                    <div id="github-options-container"
+                        style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                        <label
+                            style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Optional:
+                            Target Repository</label>
+                        <input type="text" id="github-repo-input"
+                            placeholder="owner/repo"
+                            style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                    </div>
+
+                    <div id="appsettings-options-container"
+                        style="display: none; margin-top: 15px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-default);">
+                        <div style="margin-bottom: 10px;">
+                            <label
+                                style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Environment
+                                (optional)</label>
+                            <input type="text" id="appsettings-env-input"
+                                list="env-datalist"
+                                placeholder="e.g. Development"
+                                style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); outline: none;">
+                            <datalist id="env-datalist"></datalist>
+                        </div>
+                        <div
+                            style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox"
+                                id="appsettings-include-prefix" checked
+                                style="width: 14px; height: 14px;">
+                            <label for="appsettings-include-prefix"
+                                style="font-size: 12px; color: var(--text-secondary); cursor: pointer;">Include
+                                full variable name (Suppress prefix if
+                                unchecked)</label>
+                        </div>
+                    </div>
+
+                    <div
+                        style="margin-top: 20px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 11px; border: 1px solid var(--border-default);">
+                        <strong>Preview:</strong>
+                        <pre id="script-export-preview"
+                            style="margin-top: 8px; color: var(--accent-primary); max-height: 150px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px;"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="script-export-cancel"
+                        class="btn btn-secondary">Cancel</button>
+                    <div style="flex: 1;"></div>
+                    <button id="export-action-browser" class="btn btn-secondary"
+                        style="color: var(--accent-primary);">Show in
+                        Browser</button>
+                    <button id="export-action-editor" class="btn btn-secondary"
+                        style="color: var(--accent-primary);">Open in
+                        Editor</button>
+                    <button id="script-export-save" class="btn btn-primary">Save
+                        to File</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="btn-delete-selected" style="display: none;"></div>
+
+        <!-- Context Menu -->
+        <div id="context-menu" class="context-menu" style="display: none;">
+            <div class="menu-item var-action" id="menu-view">👁️ View</div>
+            <div class="menu-item var-action" id="menu-edit">✏️ Edit</div>
+            <div class="menu-item var-action" id="menu-copy">📋 Copy</div>
+            <div class="menu-item var-action" id="menu-clone">👯 Clone
+                Selected</div>
+            <div class="menu-item var-action" id="menu-copy-to-group">📦 Copy to
+                Group...</div>
+            <div class="menu-item var-action" id="menu-move-to-group">➡️ Move to
+                Group...</div>
+            <div class="menu-item var-action" id="menu-protect">🛡️ <span
+                    id="menu-protect-text">Protect</span></div>
+            <div class="menu-item var-action" id="menu-history">🕒 History</div>
+            <div class="menu-item var-action" id="menu-optimize">⚡
+                Optimize</div>
+            <div class="menu-item var-action" id="menu-open-path">📁 Show in
+                Folder</div>
+            <div class="menu-item folder-action" id="menu-folder-open">📂
+                Open</div>
+            <div class="menu-item folder-action" id="menu-folder-add">➕ Add
+                Variable Here</div>
+            <div class="menu-item folder-action" id="menu-folder-protect">🛡️
+                <span id="menu-folder-protect-text">Protect All
+                    Inside</span></div>
+            <div class="menu-item folder-action" id="menu-folder-rename">✏️
+                Rename Group...</div>
+            <div class="menu-item folder-action" id="menu-folder-autoprotect">📦
+                Auto Protect Folder</div>
+            <div class="menu-item folder-action" id="menu-folder-ungroup"
+                style="display: none;">🔗 Ungroup Group</div>
+            <div class="menu-item general-action" id="menu-general-add">➕ Add
+                Variable Here</div>
+            <div class="menu-sep"></div>
+            <div class="menu-item menu-danger" id="menu-delete">🗑️ Delete</div>
+        </div>
+
+        <script type="module" src="renderer.js"></script>
+    </body>
 </html>

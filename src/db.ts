@@ -131,6 +131,14 @@ export async function deleteHistory(ids: string[]): Promise<void> {
     await db.run(`DELETE FROM VariableHistory WHERE id IN (${placeholders})`, ids);
 }
 
+export async function deleteHistoryByDay(dayISO: string): Promise<number> {
+    const result = await db.run(
+        `DELETE FROM VariableHistory WHERE date(timestamp) = date(?) OR date(timestamp, 'localtime') = date(?)`,
+        [dayISO, dayISO]
+    );
+    return result.changes ?? 0;
+}
+
 export async function getHistory(varName?: string): Promise<VarHistory[]> {
     if (varName) {
         return await db.all<VarHistory[]>('SELECT * FROM VariableHistory WHERE variable_name = ? ORDER BY timestamp DESC', [varName]);

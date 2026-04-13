@@ -47,9 +47,9 @@ export class ModalManager {
         $('modal-close').onclick = () => this.closeEditModal();
         $('modal-cancel').onclick = () => this.closeEditModal();
         $('modal-save').onclick = () => this.handleEditSave();
-        
+
         $('confirm-cancel').onclick = () => this.closeConfirmModal();
-        
+
         $('group-modal-close').onclick = () => this.closeGroupModal();
         $('group-modal-cancel').onclick = () => this.closeGroupModal();
         $('group-modal-save').onclick = () => this.handleGroupSave();
@@ -118,14 +118,14 @@ export class ModalManager {
         state.editingVar = v || null;
         this.modalTitle.textContent = v ? 'Edit Variable' : 'Create Variable';
         this.modalSaveBtn.textContent = v ? 'Save Changes' : 'Create';
-        
+
         const isProtected = v ? state.protectedVars.has(v.name) : false;
 
         // Always reset UI state first — prevents bleed from previous open
         this.varValueInput.style.display = 'block';
         this.varValueInput.readOnly = false;
         this.varValueInput.style.opacity = '1';
-        
+
         const multiContainer = $('modal-multi-value-container');
         if (multiContainer) {
             multiContainer.style.display = 'none';
@@ -148,7 +148,7 @@ export class ModalManager {
         if (isMulti && multiContainer) {
             this.varValueInput.style.display = 'none';
             multiContainer.style.display = 'flex';
-            
+
             const parts = displayValue.split(';').map(p => p.trim()).filter(p => !!p);
             parts.forEach((p, idx) => {
                 const row = document.createElement('div');
@@ -160,12 +160,12 @@ export class ModalManager {
                     <button class="btn-icon btn-remove" title="Remove" style="color:var(--error-color);"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                 `;
                 row.querySelector('.btn-remove')?.addEventListener('click', () => {
-                   row.remove();
-                   if (multiContainer.children.length === 0) {
-                       multiContainer.style.display = 'none';
-                       this.varValueInput.style.display = 'block';
-                       this.varValueInput.value = '';
-                   }
+                    row.remove();
+                    if (multiContainer.children.length === 0) {
+                        multiContainer.style.display = 'none';
+                        this.varValueInput.style.display = 'block';
+                        this.varValueInput.value = '';
+                    }
                 });
                 multiContainer.appendChild(row);
             });
@@ -200,7 +200,7 @@ export class ModalManager {
             const rb = document.getElementById('btn-modal-reveal') as HTMLElement;
             if (m) m.style.display = masked ? 'flex' : 'none';
             if (rb) rb.style.display = currentlyProtected ? 'block' : 'none';
-            
+
             this.varValueInput.readOnly = masked;
             this.varValueInput.style.opacity = masked ? '0' : '1';
             if (multiContainer) multiContainer.style.opacity = masked ? '0.3' : '1';
@@ -239,11 +239,11 @@ export class ModalManager {
         state.editingVar = null;
         this.modalTitle.textContent = 'Clone Variable';
         this.modalSaveBtn.textContent = 'Create Clone';
-        
+
         this.varNameInput.value = v.name + '_copy';
         this.varValueInput.value = v.value;
         this.varProtectedInput.checked = state.protectedVars.has(v.name);
-        
+
         this.varNameInput.disabled = false; // Allow renaming the clone
         this.modalOverlay.classList.add('active');
         this.varNameInput.focus();
@@ -267,7 +267,7 @@ export class ModalManager {
         const name = this.varNameInput.value.trim();
         const isProtected = this.varProtectedInput.checked;
         const multiContainer = $('modal-multi-value-container');
-        
+
         let value = '';
         if (multiContainer && multiContainer.style.display === 'flex') {
             const fields = multiContainer.querySelectorAll('.multi-val-field') as NodeListOf<HTMLInputElement>;
@@ -275,7 +275,7 @@ export class ModalManager {
         } else {
             value = this.varValueInput.value.trim();
         }
-        
+
         if (!name) {
             showToast('Name is required', 'error');
             return;
@@ -318,9 +318,9 @@ export class ModalManager {
                 this.currentConfirmResolve(false);
             }
             this.currentConfirmResolve = resolve;
-            
+
             this.confirmMessage.textContent = message;
-            
+
             this.confirmActionBtn.onclick = () => {
                 this.confirmOverlay.classList.remove('active');
                 this.currentConfirmResolve = null;
@@ -385,13 +385,13 @@ export class ModalManager {
                 if (origCountEl) origCountEl.textContent = v.value.length.toString();
                 if (newCountEl) newCountEl.textContent = result.optimized.length.toString();
                 if (redValEl) redValEl.textContent = result.savings.toString();
-                
+
                 const percent = Math.round((result.savings / v.value.length) * 100);
                 if (redPercEl) redPercEl.textContent = percent.toString();
 
                 // Store for apply
                 (this as any)._currentOptimizeVar = { name, value: result.optimized };
-                
+
                 this.optimizeOverlay.classList.add('active');
             } else {
                 showToast(result.error || 'No optimization possible', 'warning');
@@ -418,8 +418,8 @@ export class ModalManager {
         }
     }
 
-    async openImportReviewModal(vars: EnvVar[], options: { 
-        title?: string, 
+    async openImportReviewModal(vars: EnvVar[], options: {
+        title?: string,
         mode?: 'import' | 'clone' | 'move' | 'copy-group' | 'rename-group',
         defaultPrefix?: string,
         stripPrefix?: string
@@ -436,7 +436,7 @@ export class ModalManager {
         const btnCancel = $('import-review-cancel');
         const btnClose = $('import-review-modal-close');
         const btnReveal = $('btn-import-review-reveal');
-        
+
         const prefixInput = $('import-prefix-input') as HTMLInputElement;
         const separatorInput = $('import-separator-input') as HTMLInputElement;
         const deleteOriginalsCheck = $('import-delete-originals') as HTMLInputElement;
@@ -471,7 +471,7 @@ export class ModalManager {
         if (replaceSeparatorsCheck) {
             replaceSeparatorsCheck.onclick = () => renderLists();
         }
-        
+
         if (newSelectAll) {
             newSelectAll.checked = true;
             newSelectAll.onchange = () => {
@@ -491,7 +491,7 @@ export class ModalManager {
         const getFinalName = (origName: string) => {
             const doReplace = replaceSeparatorsCheck?.checked;
             const p = prefix ? `${prefix}${separator}` : '';
-            
+
             let workingName = origName;
             if (options.stripPrefix && workingName.startsWith(options.stripPrefix)) {
                 workingName = workingName.substring(options.stripPrefix.length);
@@ -506,7 +506,7 @@ export class ModalManager {
         const renderLists = () => {
             newList.innerHTML = '';
             existingList.innerHTML = '';
-            
+
             const newVars = vars.filter(v => !state.allEnvVars.some(ev => ev.name === getFinalName(v.name)));
             const existingVars = vars.filter(v => state.allEnvVars.some(ev => ev.name === getFinalName(v.name)));
 
@@ -521,7 +521,7 @@ export class ModalManager {
                 item.style.display = 'flex';
                 item.style.alignItems = 'center';
                 item.style.gap = '8px';
-                
+
                 const finalName = getFinalName(v.name);
                 const displayVal = isRevealed ? escapeHtml(v.value) : '********';
                 const blurStyle = isRevealed ? '' : 'filter:blur(3px); opacity:0.5;';
@@ -545,11 +545,11 @@ export class ModalManager {
                 item.style.background = 'rgba(255, 152, 0, 0.05)';
                 item.style.border = '1px solid rgba(255, 152, 0, 0.2)';
                 item.style.borderRadius = '4px';
-                
+
                 const finalName = getFinalName(v.name);
                 const displayVal = isRevealed ? escapeHtml(v.value) : '********';
                 const blurStyle = isRevealed ? '' : 'filter:blur(3px); opacity:0.5;';
-                
+
                 item.innerHTML = `
                     <input type="checkbox" checked class="import-overwrite-check" data-original-name="${v.name}" />
                     <div style="flex:1">
@@ -586,13 +586,13 @@ export class ModalManager {
             const p = prefix ? `${prefix}${separator}` : '';
             const shouldGroup = groupByPrefixCheck?.checked && prefix;
             const shouldDelete = deleteOriginalsCheck?.checked;
-            
+
             const newChecks = newList.querySelectorAll('.import-new-check:checked');
             const overwriteChecks = existingList.querySelectorAll('.import-overwrite-check:checked');
-            
+
             const toImport: EnvVar[] = [];
             const originalNamesToDelete: string[] = [];
-            
+
             newChecks.forEach(c => {
                 const origName = (c as HTMLInputElement).dataset.originalName;
                 const v = vars.find(x => x.name === origName);
@@ -601,7 +601,7 @@ export class ModalManager {
                     if (shouldDelete) originalNamesToDelete.push(origName!);
                 }
             });
-            
+
             overwriteChecks.forEach(c => {
                 const origName = (c as HTMLInputElement).dataset.originalName;
                 const v = vars.find(x => x.name === origName);
@@ -614,7 +614,7 @@ export class ModalManager {
             if (toImport.length > 0) {
                 const { importService } = await import('../services/ImportService.js');
                 await importService.processImport(toImport);
-                
+
                 // If it's a move, delete original variables
                 if (shouldDelete && originalNamesToDelete.length > 0) {
                     // Filter out names that are same as target (no-op move)
@@ -630,7 +630,7 @@ export class ModalManager {
                     const { groupingService } = await import('../services/GroupingService.js');
                     await groupingService.createGroupFromList(groupName, names);
                 }
-                
+
                 await actionService.loadEnvVars(true);
                 showToast(`${shouldDelete ? 'Moved' : (options.mode === 'clone' ? 'Cloned' : 'Imported')} ${toImport.length} variables successfully`);
             }
@@ -646,6 +646,8 @@ export class ModalManager {
         const cancelBtn = $('history-modal-cancel');
         const searchInput = $('history-search') as HTMLInputElement;
         const opFilter = $('history-op-filter') as HTMLSelectElement;
+        const dayInput = $('history-day-input') as HTMLInputElement;
+        const btnDeleteDayTop = $('btn-history-delete-day-top') as HTMLButtonElement;
 
         const close = () => overlay.classList.remove('active');
         closeBtn.onclick = close;
@@ -665,6 +667,7 @@ export class ModalManager {
 
         if (searchInput) searchInput.value = '';
         if (opFilter) opFilter.value = '';
+        if (dayInput) dayInput.value = '';
 
         const selectAll = $('history-select-all') as HTMLInputElement;
         if (selectAll) {
@@ -678,9 +681,31 @@ export class ModalManager {
             btnDeleteBulk.onclick = () => this.handleHistoryDelete([...this.historySelectedIds]);
         }
 
+        if (btnDeleteDayTop) {
+            btnDeleteDayTop.onclick = async () => {
+                if (!dayInput?.value) {
+                    showToast('Select a day first', 'error');
+                    return;
+                }
+                const dayISO = dayInput.value;
+                const dateLabel = new Date(`${dayISO}T00:00:00`).toLocaleDateString();
+                this.openConfirmModal(`Delete all history entries from ${dateLabel}?`, async () => {
+                    const res = await window.electronAPI.deleteHistoryByDay(dayISO);
+                    if (res.success) {
+                        showToast(`Deleted ${res.count} entr${res.count === 1 ? 'y' : 'ies'} from ${dateLabel}`);
+                        this.historyData = this.historyData.filter(h => new Date(h.timestamp).toISOString().slice(0, 10) !== dayISO);
+                        this.historySelectedIds.clear();
+                        this.renderHistory();
+                    } else {
+                        showToast(`Failed to delete day logs: ${res.error}`, 'error');
+                    }
+                });
+            };
+        }
+
         try {
             this.historyData = await window.electronAPI.getVarHistory(varName);
-            
+
             // Wire listeners
             if (searchInput) {
                 searchInput.oninput = () => {
@@ -694,18 +719,18 @@ export class ModalManager {
                     this.renderHistory();
                 };
             }
-            
+
             document.querySelectorAll('.history-sort-col').forEach(el => {
                 const col = (el as HTMLElement).dataset.sort!;
                 (el as HTMLElement).onclick = () => {
-                   if (this.historySortBy === col) {
-                       this.historySortOrder = this.historySortOrder === 'asc' ? 'desc' : 'asc';
-                   } else {
-                       this.historySortBy = col;
-                       this.historySortOrder = col === 'timestamp' ? 'desc' : 'asc';
-                   }
-                   this.updateHistorySortUI();
-                   this.renderHistory();
+                    if (this.historySortBy === col) {
+                        this.historySortOrder = this.historySortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.historySortBy = col;
+                        this.historySortOrder = col === 'timestamp' ? 'desc' : 'asc';
+                    }
+                    this.updateHistorySortUI();
+                    this.renderHistory();
                 };
             });
 
@@ -736,16 +761,16 @@ export class ModalManager {
     private renderHistory() {
         const list = $('history-list');
         const overlay = $('history-overlay');
-        
+
         // Filter
         let filtered = this.historyData.filter(item => {
-            const matchesSearch = !this.historySearch || 
+            const matchesSearch = !this.historySearch ||
                 item.variable_name.toLowerCase().includes(this.historySearch) ||
                 (item.old_value || '').toLowerCase().includes(this.historySearch) ||
                 (item.new_value || '').toLowerCase().includes(this.historySearch);
-                
+
             const matchesOp = !this.historyOpFilter || item.operation === this.historyOpFilter;
-            
+
             return matchesSearch && matchesOp;
         });
 
@@ -753,7 +778,7 @@ export class ModalManager {
         filtered.sort((a, b) => {
             let vA = a[this.historySortBy] || '';
             let vB = b[this.historySortBy] || '';
-            
+
             if (this.historySortBy === 'timestamp') {
                 vA = new Date(vA).getTime();
                 vB = new Date(vB).getTime();
@@ -776,20 +801,21 @@ export class ModalManager {
         filtered.forEach(item => {
             const row = document.createElement('div');
             // Column layout: Checkbox, Operation, Name (+ Badge), Timestamp, Value Change, Actions
-            row.style.cssText = 'display:grid; grid-template-columns: 40px 60px 140px 130px 1fr 100px; gap:12px; padding:12px 24px; border-bottom:1px solid var(--border-default); align-items:center; transition:0.2s;';
-            
+            row.style.cssText = 'display:grid; grid-template-columns: 40px 60px 140px 130px 1fr 140px; gap:12px; padding:12px 24px; border-bottom:1px solid var(--border-default); align-items:center; transition:0.2s;';
+
             const isSelected = this.historySelectedIds.has(item.id);
             if (isSelected) row.style.background = 'rgba(124, 106, 255, 0.05)';
 
             const timestamp = new Date(item.timestamp).toLocaleString();
-            const opColor = item.operation === 'CREATE' ? 'var(--success)' : 
-                           (item.operation === 'DELETE' ? 'var(--error)' : 
-                           (item.operation === 'PROTECT' || item.operation === 'UNPROTECT' ? 'var(--warning)' : 'var(--accent-primary)'));
+            const dayISO = new Date(item.timestamp).toISOString().slice(0, 10);
+            const opColor = item.operation === 'CREATE' ? 'var(--success)' :
+                (item.operation === 'DELETE' ? 'var(--error)' :
+                    (item.operation === 'PROTECT' || item.operation === 'UNPROTECT' ? 'var(--warning)' : 'var(--accent-primary)'));
             const protectionBadge = item.was_protected ? '<span style="color:var(--error); font-size:9px; font-weight:bold; margin-left:6px; letter-spacing:0.05em; vertical-align:middle;">[PROTECTED]</span>' : '';
-            
+
             const isRevealed = this.historyRevealedIds.has(item.id);
             const mask = '••••••••';
-            
+
             const renderValue = (val: string | null) => {
                 if (!val) return '';
                 if (item.was_protected && !isRevealed) return mask;
@@ -809,7 +835,7 @@ export class ModalManager {
                 const oldVal = renderValue(item.old_value);
                 const newVal = renderValue(item.new_value);
                 const isSameValue = item.old_value === item.new_value;
-                
+
                 if (isSameValue) {
                     valueChange = `<div style="font-size:11px; color:var(--text-muted);"><span style="color:var(--warning); font-weight:600;">Security Change:</span> Protection status modified for <code style="white-space:pre-wrap; word-break:break-all;">${escapeHtml(newVal)}</code></div>`;
                 } else {
@@ -828,7 +854,7 @@ export class ModalManager {
             const currentVar = state.allEnvVars.find(v => v.name === item.variable_name);
             const currentValue = currentVar ? currentVar.value : null;
             const currentProtection = state.protectedVars.has(item.variable_name);
-            
+
             let targetValue: string | null = null;
             if (item.operation === 'CREATE') {
                 targetValue = item.new_value;
@@ -854,9 +880,8 @@ export class ModalManager {
                 </div>
                 <div style="text-align:right; display:flex; gap:8px; justify-content:flex-end;">
                     ${restoreBtn}
-                    <button class="btn-icon btn-xs btn-history-delete" data-id="${item.id}" title="Delete this entry" style="color:var(--text-muted); hover:var(--error);">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    </button>
+                    <button class="btn btn-secondary btn-xs btn-history-delete-day" data-day="${dayISO}" title="Delete all entries from this day">Delete Day</button>
+                    <button class="btn btn-danger btn-xs btn-history-delete" data-id="${item.id}" title="Delete this entry">Delete Entry</button>
                 </div>
             `;
 
@@ -890,6 +915,21 @@ export class ModalManager {
                 this.handleHistoryDelete([item.id]);
             });
 
+            row.querySelector('.btn-history-delete-day')?.addEventListener('click', async () => {
+                const dateLabel = new Date(item.timestamp).toLocaleDateString();
+                this.openConfirmModal(`Delete all history entries from ${dateLabel}?`, async () => {
+                    const res = await window.electronAPI.deleteHistoryByDay(dayISO);
+                    if (res.success) {
+                        showToast(`Deleted ${res.count} entr${res.count === 1 ? 'y' : 'ies'} from ${dateLabel}`);
+                        this.historyData = this.historyData.filter(h => new Date(h.timestamp).toISOString().slice(0, 10) !== dayISO);
+                        this.historySelectedIds.clear();
+                        this.renderHistory();
+                    } else {
+                        showToast(`Failed to delete day logs: ${res.error}`, 'error');
+                    }
+                });
+            });
+
             list.appendChild(row);
         });
 
@@ -899,7 +939,7 @@ export class ModalManager {
     private toggleHistorySelection(id: string, selected: boolean) {
         if (selected) this.historySelectedIds.add(id);
         else this.historySelectedIds.delete(id);
-        
+
         // Update Select All state
         const allChecks = document.querySelectorAll('.history-item-check') as NodeListOf<HTMLInputElement>;
         const selectAll = $('history-select-all') as HTMLInputElement;
@@ -909,7 +949,7 @@ export class ModalManager {
             selectAll.checked = allChecked;
             selectAll.indeterminate = someChecked && !allChecked;
         }
-        
+
         this.updateHistoryToolbar();
     }
 
@@ -928,7 +968,7 @@ export class ModalManager {
         const count = this.historySelectedIds.size;
         const btnDelete = $('btn-history-delete-bulk');
         const countEl = $('history-selection-count');
-        
+
         if (btnDelete && countEl) {
             btnDelete.style.display = count > 0 ? 'flex' : 'none';
             countEl.textContent = count > 1 ? `(${count})` : '';
@@ -937,11 +977,11 @@ export class ModalManager {
 
     private async handleHistoryDelete(ids: string[]) {
         if (ids.length === 0) return;
-        
-        const message = ids.length === 1 
-            ? "Are you sure you want to delete this history log entry?" 
+
+        const message = ids.length === 1
+            ? "Are you sure you want to delete this history log entry?"
             : `Are you sure you want to delete ${ids.length} history log entries?`;
-            
+
         this.openConfirmModal(message, async () => {
             const res = await window.electronAPI.deleteHistory(ids);
             if (res.success) {
@@ -963,7 +1003,7 @@ export class ModalManager {
         const content = $('view-value-content') as HTMLTextAreaElement;
         const gridContainer = $('view-value-grid-container');
         const grid = $('view-value-grid');
-        
+
         const closeBtn = $('view-value-close');
         const cancelBtn = $('view-value-cancel');
         const copyBtn = $('view-value-copy');
@@ -971,7 +1011,7 @@ export class ModalManager {
         const close = () => overlay.classList.remove('active');
         closeBtn.onclick = close;
         cancelBtn.onclick = close;
-        
+
         title.textContent = v.name;
         nameLabel.textContent = `Value of ${v.name}`;
 
@@ -987,12 +1027,12 @@ export class ModalManager {
             content.style.display = 'none';
             gridContainer.style.display = 'flex';
             grid.innerHTML = '';
-            
+
             v.value.split(';').map(p => p.trim()).filter(p => !!p).forEach(p => {
                 const row = document.createElement('div');
                 row.className = 'multi-path-row';
                 row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:8px; background:var(--bg-tertiary); border:1px solid var(--border-default); border-radius:4px; transition:0.2s;';
-                
+
                 row.innerHTML = `
                     <div style="flex:1; overflow:hidden; text-overflow:ellipsis; font-family:var(--font-mono); font-size:12px; color:var(--text-primary);">
                         ${escapeHtml(p)}
@@ -1001,13 +1041,13 @@ export class ModalManager {
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </button>
                 `;
-                
+
                 row.querySelector('.btn-open-sub')!.addEventListener('click', () => {
                     const isFile = p.includes('.') || p.endsWith('.txt');
                     if (isFile) window.electronAPI.showItemInFolder(p);
                     else window.electronAPI.openPath(p);
                 });
-                
+
                 grid.appendChild(row);
             });
         } else {
@@ -1041,11 +1081,11 @@ export class ModalManager {
         try {
             const categories = await window.electronAPI.getOsVars() as any as Record<string, Record<string, string>>;
             list.innerHTML = '';
-            
+
             Object.keys(categories).forEach(cat => {
                 const vars = categories[cat];
                 const sortedKeys = Object.keys(vars).sort();
-                
+
                 if (sortedKeys.length > 0) {
                     const header = document.createElement('div');
                     header.style.cssText = 'padding:14px 20px; background:var(--bg-tertiary); font-weight:700; font-size:11px; border-bottom: 2px solid var(--border-default); color:var(--accent-primary); text-transform:uppercase; letter-spacing:0.1em;';
@@ -1056,13 +1096,13 @@ export class ModalManager {
                         this.osVarsData[key] = vars[key];
                         // Using shared robust case-insensitive helper
                         const isProtectedVar = isProtected(key);
-                        
+
                         const item = document.createElement('div');
                         item.className = 'os-var-row';
                         item.style.cssText = 'padding:12px 20px; border-bottom:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:6px; transition: 0.2s;';
                         item.onmouseover = () => item.style.background = 'rgba(255,255,255,0.02)';
                         item.onmouseout = () => item.style.background = 'transparent';
-                        
+
                         item.innerHTML = `
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <input type="checkbox" class="os-var-check" data-key="${escapeHtml(key)}" style="margin-right: 4px;" />
@@ -1095,16 +1135,16 @@ export class ModalManager {
                                 e.stopPropagation();
                                 const key = btnReveal.dataset.key!;
                                 const isNowRevealed = !state.revealedVars.has(key);
-                                
+
                                 if (isNowRevealed) state.revealedVars.add(key);
                                 else state.revealedVars.delete(key);
-                                
+
                                 // Update row UI instantly without re-rendering modal (avoiding blink)
                                 const valueDiv = item.querySelector('.os-var-value') as HTMLElement;
                                 if (valueDiv) {
                                     valueDiv.textContent = getMaskedValue(key, vars[key], isNowRevealed);
                                 }
-                                
+
                                 // Update button title and icon
                                 btnReveal.title = isNowRevealed ? 'Hide value' : 'Show value';
                                 // SVG doesn't strictly need update for color, but could if needed. 
@@ -1161,7 +1201,7 @@ export class ModalManager {
         if (success) {
             const isProtectedVar = isProtected(key);
             btn.classList.toggle('active', isProtectedVar);
-            
+
             // Also toggle value masking in the UI
             const row = btn.closest('.os-var-row');
             if (row) {
@@ -1197,7 +1237,7 @@ export class ModalManager {
     openScriptExportModal(vars: any[], isMasked: boolean) {
         const overlay = $('script-export-overlay');
         if (!overlay) return;
-        
+
         const preview = $('script-export-preview');
         const closeBtn = $('script-export-close');
         const cancelBtn = $('script-export-cancel');
@@ -1209,7 +1249,7 @@ export class ModalManager {
         const githubRepoInput = $('github-repo-input') as HTMLInputElement;
         const appSettingsEnvInput = $('appsettings-env-input') as HTMLInputElement;
         const appSettingsIncludePrefixInput = $('appsettings-include-prefix') as HTMLInputElement;
-        
+
         const activeBtn = overlay.querySelector('.export-mode-btn.active') as HTMLElement;
         let currentMode = activeBtn?.dataset.mode || 'standard';
 
@@ -1236,7 +1276,7 @@ export class ModalManager {
                 // Determine the final mask string to use
                 const maskString = currentBlank ? '' : '********';
                 const isActiveMasking = currentMaskedMaster && !currentExclude;
-                
+
                 const targetOs = osSelect?.value || (navigator.userAgent.toLowerCase().includes('win') ? 'windows' : 'linux');
                 const isWin = targetOs === 'windows';
                 const winCmd = winCmdSelect?.value || 'set';
@@ -1279,7 +1319,7 @@ export class ModalManager {
                 if (currentMode === 'appsettings') {
                     const fileName = env ? `appsettings.${env}.json` : 'appsettings.json';
                     text = `// File: ${fileName}\n`;
-                    
+
                     // Build hierarchy and handle array conversion (matching main.ts logic)
                     const data: any = {};
                     sample.forEach(v => {
@@ -1288,7 +1328,7 @@ export class ModalManager {
                             const parts = name.split(/__|:/).filter((p: string) => !!p);
                             if (parts.length > 1) name = parts.slice(1).join('__');
                         }
-                        
+
                         const val = (v.isProtected && isActiveMasking) ? maskString : v.value;
                         const pathParts = name.split(/__|:/).filter((p: string) => !!p);
                         let curr = data;
@@ -1308,7 +1348,7 @@ export class ModalManager {
                         const keys = Object.keys(obj);
                         const isAllNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
                         if (isAllNumeric) {
-                            const sortedKeys = keys.map(Number).sort((a,b) => a-b);
+                            const sortedKeys = keys.map(Number).sort((a, b) => a - b);
                             const minKey = sortedKeys[0];
                             const arr: any[] = [];
                             keys.forEach(k => {
@@ -1426,7 +1466,7 @@ export class ModalManager {
                 updatePreview();
             };
         }
-        
+
         syncCheckboxes();
 
         modeButtons.forEach(btn => {
@@ -1446,7 +1486,7 @@ export class ModalManager {
             const currentMasked = maskCheckbox?.checked ?? isMasked;
             const targetOs = osSelect?.value || 'windows';
             const winCmd = winCmdSelect?.value || 'set';
-            
+
             let extra = '';
             if (currentMode === 'github') {
                 extra = (document.getElementById('github-repo-input') as HTMLInputElement)?.value || '';
@@ -1468,7 +1508,7 @@ export class ModalManager {
                 // For standard export, pass OS and CMD info
                 extra = `${targetOs}|${winCmd}`;
             }
-            
+
             const currentExclude = excludeCheckbox?.checked ?? false;
             const currentBlank = maskBlankCheckbox?.checked ?? false;
             const res = await (window as any).electronAPI.exportEnvVars(vars, 'script', currentMasked, currentMode, extra, action, currentExclude, currentBlank);
@@ -1481,7 +1521,7 @@ export class ModalManager {
         };
 
         if (saveBtn) saveBtn.onclick = () => doExport('save');
-        
+
         const browserBtn = $('export-action-browser');
         if (browserBtn) {
             browserBtn.onclick = () => doExport('browser');
@@ -1520,7 +1560,7 @@ export class ModalManager {
             // get mouse cursor position at startup
             let pos3 = e.clientX;
             let pos4 = e.clientY;
-            
+
             // To make dragging smooth and avoid centering issues, we switch to fixed positioning
             const rect = modal.getBoundingClientRect();
             modal.style.position = 'fixed';
@@ -1557,16 +1597,16 @@ export class ModalManager {
             const resizer = document.createElement('div');
             resizer.className = `resizer resizer-${dir}`;
             modal.appendChild(resizer);
-            
+
             resizer.onmousedown = (e: MouseEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 const startX = e.clientX;
                 const startY = e.clientY;
                 const startWidth = modal.offsetWidth;
                 const startHeight = modal.offsetHeight;
-                
+
                 // Switch to fixed if not already (important for top/left changes)
                 const startRect = modal.getBoundingClientRect();
                 modal.style.position = 'fixed';
@@ -1574,7 +1614,7 @@ export class ModalManager {
                 modal.style.left = startRect.left + 'px';
                 modal.style.margin = '0';
                 modal.style.transform = 'none';
-                
+
                 // Capture initial top/left after switching to fixed
                 const startTop = modal.offsetTop;
                 const startLeft = modal.offsetLeft;
@@ -1582,7 +1622,7 @@ export class ModalManager {
                 const resize = (ev: MouseEvent) => {
                     const diffX = ev.clientX - startX;
                     const diffY = ev.clientY - startY;
-                    
+
                     if (dir.includes('e')) {
                         modal.style.width = Math.max(320, startWidth + diffX) + 'px';
                     }
@@ -1604,12 +1644,12 @@ export class ModalManager {
                         }
                     }
                 };
-                
+
                 const stopResize = () => {
-                   document.removeEventListener('mousemove', resize);
-                   document.removeEventListener('mouseup', stopResize);
+                    document.removeEventListener('mousemove', resize);
+                    document.removeEventListener('mouseup', stopResize);
                 };
-                
+
                 document.addEventListener('mousemove', resize);
                 document.addEventListener('mouseup', stopResize);
             };
